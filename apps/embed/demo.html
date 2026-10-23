@@ -160,8 +160,12 @@
       };
 
       if (window.AgentBridgeWidget) {
-        window.AgentBridgeWidget.init(config);
-        console.log("Widget reinitialized with config:", config);
+        const ok = window.AgentBridgeWidget.init(config);
+        if (ok) {
+          console.log("Widget initialized with config:", config);
+        } else {
+          console.error("Widget rejected the config (see error above):", config);
+        }
       } else {
         console.error(
           "AgentBridgeWidget has not loaded yet. Check the embed script and build."

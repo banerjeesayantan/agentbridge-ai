@@ -18,6 +18,7 @@ import {
 } from "@workspace/ui/components/dialog";
 import { useState } from "react";
 import { createScript } from "../../utils";
+import { CodeBlock } from "../components/code-block";
 
 export const IntegrationsView = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -124,15 +125,6 @@ export const IntegrationsDialog = ({
   onOpenChange: (value: boolean) => void;
   snippet: string;
 }) => {
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(snippet);
-      toast.success("Copied to clipboard");
-    } catch {
-      toast.error("Failed to copy to clipboard");
-    }
-  };
-
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent>
@@ -148,19 +140,7 @@ export const IntegrationsDialog = ({
             <div className="rounded-md bg-accent p-2 text-sm">
               1. Copy the following code
             </div>
-            <div className="group relative">
-              <pre className="max-h-[300px] overflow-x-auto overflow-y-auto whitespace-pre-wrap break-all rounded-md bg-foreground p-2 font-mono text-secondary text-sm">
-                {snippet}
-              </pre>
-              <Button
-                className="absolute top-4 right-6 size-6 opacity-0 transition-opacity group-hover:opacity-100"
-                onClick={handleCopy}
-                size="icon"
-                variant="secondary"
-              >
-                <CopyIcon className="size-3" />
-              </Button>
-            </div>
+            <CodeBlock code={snippet} label="embed snippet" />
           </div>
 
           <div className="space-y-2">

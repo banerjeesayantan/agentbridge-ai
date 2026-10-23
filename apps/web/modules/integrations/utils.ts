@@ -1,4 +1,5 @@
 import {
+  EMBED_SCRIPT_URL,
   HTML_SCRIPT,
   type IntegrationId,
   JAVASCRIPT_SCRIPT,
@@ -6,22 +7,27 @@ import {
   REACT_SCRIPT,
 } from "./constants";
 
+export type WidgetPosition = "bottom-right" | "bottom-left";
+
+const TEMPLATES: Record<IntegrationId, string> = {
+  html: HTML_SCRIPT,
+  react: REACT_SCRIPT,
+  nextjs: NEXTJS_SCRIPT,
+  javascript: JAVASCRIPT_SCRIPT,
+};
+
 export const createScript = (
   integrationId: IntegrationId,
   organizationId: string,
+  position: WidgetPosition = "bottom-right",
+  scriptUrl: string = EMBED_SCRIPT_URL,
 ) => {
-  if (integrationId === "html") {
-    return HTML_SCRIPT.replace(/{{ORGANIZATION_ID}}/g, organizationId);
-  }
-  if (integrationId === "react") {
-    return REACT_SCRIPT.replace(/{{ORGANIZATION_ID}}/g, organizationId);
-  }
-  if (integrationId === "nextjs") {
-    return NEXTJS_SCRIPT.replace(/{{ORGANIZATION_ID}}/g, organizationId);
-  }
-  if (integrationId === "javascript") {
-    return JAVASCRIPT_SCRIPT.replace(/{{ORGANIZATION_ID}}/g, organizationId);
-  }
+  const template = TEMPLATES[integrationId];
+  if (!template) return "";
 
-  return "";
+  // Function replacers so "$" sequences in values are never interpreted.
+  return template
+    .replace(/{{SCRIPT_URL}}/g, () => scriptUrl)
+    .replace(/{{ORGANIZATION_ID}}/g, () => organizationId)
+    .replace(/{{POSITION}}/g, () => position);
 };

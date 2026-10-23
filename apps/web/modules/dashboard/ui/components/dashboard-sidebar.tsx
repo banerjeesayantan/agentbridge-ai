@@ -3,6 +3,7 @@
 import { OrganizationSwitcher, UserButton } from "@clerk/nextjs";
 import {
   CreditCardIcon,
+  FlaskConicalIcon,
   InboxIcon,
   LayoutDashboardIcon,
   LibraryBigIcon,
@@ -41,6 +42,11 @@ const customerSupportItems = [
 ];
 
 const configurationItems = [
+  {
+    title: "Playground",
+    url: "/",
+    icon: FlaskConicalIcon,
+  },
   {
     title: "Widget Customization",
     url: "/customization",
