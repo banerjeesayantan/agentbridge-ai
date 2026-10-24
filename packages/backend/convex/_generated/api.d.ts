@@ -10,15 +10,23 @@
 
 import type * as constants from "../constants.js";
 import type * as http from "../http.js";
+import type * as lib_entitlements from "../lib/entitlements.js";
 import type * as lib_extractTextContent from "../lib/extractTextContent.js";
+import type * as lib_knowledgeFiles from "../lib/knowledgeFiles.js";
+import type * as lib_polarApi from "../lib/polarApi.js";
+import type * as lib_polarConfig from "../lib/polarConfig.js";
+import type * as lib_polarMapping from "../lib/polarMapping.js";
 import type * as lib_secrets from "../lib/secrets.js";
+import type * as lib_standardWebhooks from "../lib/standardWebhooks.js";
 import type * as playground from "../playground.js";
+import type * as private_billing from "../private/billing.js";
 import type * as private_contactSessions from "../private/contactSessions.js";
 import type * as private_conversations from "../private/conversations.js";
 import type * as private_files from "../private/files.js";
 import type * as private_messages from "../private/messages.js";
 import type * as private_plugins from "../private/plugins.js";
 import type * as private_secrets from "../private/secrets.js";
+import type * as private_usage from "../private/usage.js";
 import type * as private_vapi from "../private/vapi.js";
 import type * as private_widgetSettings from "../private/widgetSettings.js";
 import type * as public_contactSessions from "../public/contactSessions.js";
@@ -29,6 +37,7 @@ import type * as public_secrets from "../public/secrets.js";
 import type * as public_widgetSettings from "../public/widgetSettings.js";
 import type * as system_ai_agents_supportAgent from "../system/ai/agents/supportAgent.js";
 import type * as system_ai_constants from "../system/ai/constants.js";
+import type * as system_ai_models from "../system/ai/models.js";
 import type * as system_ai_rag from "../system/ai/rag.js";
 import type * as system_ai_tools_escalateConversation from "../system/ai/tools/escalateConversation.js";
 import type * as system_ai_tools_resolveConversation from "../system/ai/tools/resolveConversation.js";
@@ -36,8 +45,10 @@ import type * as system_ai_tools_search from "../system/ai/tools/search.js";
 import type * as system_contactSessions from "../system/contactSessions.js";
 import type * as system_conversations from "../system/conversations.js";
 import type * as system_plugins from "../system/plugins.js";
+import type * as system_polarWebhook from "../system/polarWebhook.js";
 import type * as system_secrets from "../system/secrets.js";
 import type * as system_subscriptions from "../system/subscriptions.js";
+import type * as system_usage from "../system/usage.js";
 import type * as users from "../users.js";
 
 import type {
@@ -57,15 +68,23 @@ import type {
 declare const fullApi: ApiFromModules<{
   constants: typeof constants;
   http: typeof http;
+  "lib/entitlements": typeof lib_entitlements;
   "lib/extractTextContent": typeof lib_extractTextContent;
+  "lib/knowledgeFiles": typeof lib_knowledgeFiles;
+  "lib/polarApi": typeof lib_polarApi;
+  "lib/polarConfig": typeof lib_polarConfig;
+  "lib/polarMapping": typeof lib_polarMapping;
   "lib/secrets": typeof lib_secrets;
+  "lib/standardWebhooks": typeof lib_standardWebhooks;
   playground: typeof playground;
+  "private/billing": typeof private_billing;
   "private/contactSessions": typeof private_contactSessions;
   "private/conversations": typeof private_conversations;
   "private/files": typeof private_files;
   "private/messages": typeof private_messages;
   "private/plugins": typeof private_plugins;
   "private/secrets": typeof private_secrets;
+  "private/usage": typeof private_usage;
   "private/vapi": typeof private_vapi;
   "private/widgetSettings": typeof private_widgetSettings;
   "public/contactSessions": typeof public_contactSessions;
@@ -76,6 +95,7 @@ declare const fullApi: ApiFromModules<{
   "public/widgetSettings": typeof public_widgetSettings;
   "system/ai/agents/supportAgent": typeof system_ai_agents_supportAgent;
   "system/ai/constants": typeof system_ai_constants;
+  "system/ai/models": typeof system_ai_models;
   "system/ai/rag": typeof system_ai_rag;
   "system/ai/tools/escalateConversation": typeof system_ai_tools_escalateConversation;
   "system/ai/tools/resolveConversation": typeof system_ai_tools_resolveConversation;
@@ -83,8 +103,10 @@ declare const fullApi: ApiFromModules<{
   "system/contactSessions": typeof system_contactSessions;
   "system/conversations": typeof system_conversations;
   "system/plugins": typeof system_plugins;
+  "system/polarWebhook": typeof system_polarWebhook;
   "system/secrets": typeof system_secrets;
   "system/subscriptions": typeof system_subscriptions;
+  "system/usage": typeof system_usage;
   users: typeof users;
 }>;
 declare const fullApiWithMounts: typeof fullApi;

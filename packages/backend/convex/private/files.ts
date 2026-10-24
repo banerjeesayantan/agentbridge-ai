@@ -13,6 +13,8 @@ import rag from "../system/ai/rag";
 import { Id } from "../_generated/dataModel";
 import { paginationOptsValidator } from "convex/server";
 import { internal } from "../_generated/api";
+import { limitError } from "../lib/entitlements";
+import { countKnowledgeFiles } from "../lib/knowledgeFiles";
 
 function guessMimeType(filename: string, bytes: ArrayBuffer): string {
   return (
@@ -110,18 +112,25 @@ export const addFile = action({
       });
     }
 
-    const subscription = await ctx.runQuery(
-      internal.system.subscriptions.getByOrganizationId,
-      {
-        organizationId: orgId,
-      },
+    const entitlements = await ctx.runQuery(internal.system.subscriptions.getEntitlements, {
+      organizationId: orgId,
+    });
+
+    const fileCount = await countKnowledgeFiles(
+      ctx,
+      orgId,
+      entitlements.limits.knowledgeFiles,
     );
 
-    if (subscription?.status !== "active") {
-      throw new ConvexError({
-        code: "BAD_REQUEST",
-        message: "Missing subscription"
-      });
+    if (fileCount >= entitlements.limits.knowledgeFiles) {
+      throw new ConvexError(
+        limitError(
+          "knowledge-base file",
+          fileCount,
+          entitlements.limits.knowledgeFiles,
+          entitlements.periodEnd,
+        ),
+      );
     }
 
     const { bytes, filename, category } = args;

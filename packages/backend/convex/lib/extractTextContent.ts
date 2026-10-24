@@ -1,13 +1,13 @@
-import { groq } from "@ai-sdk/groq";
+import { chatModel, visionModel } from "../system/ai/models";
 import { generateText } from "ai";
 import type { StorageActionWriter } from "convex/server";
 import { assert } from "convex-helpers";
 import { Id } from "../_generated/dataModel";
 
 const AI_MODELS = {
-  image: groq("llama-3.2-90b-vision-preview"),
-  html: groq("llama-3.3-70b-versatile"),
-  pdf: groq("llama-3.3-70b-versatile"),
+  image: visionModel(),
+  html: chatModel(),
+  pdf: chatModel(),
 } as const;
 
 const SUPPORTED_IMAGE_TYPES = [

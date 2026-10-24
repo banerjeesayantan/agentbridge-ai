@@ -1,3 +1,4 @@
+import { chatModel } from "../system/ai/models";
 import { ConvexError, v } from "convex/values";
 import { generateText } from "ai";
 import { action, mutation, query } from "../_generated/server";
@@ -5,8 +6,8 @@ import { components, internal } from "../_generated/api";
 import { supportAgent } from "../system/ai/agents/supportAgent";
 import { paginationOptsValidator } from "convex/server";
 import { saveMessage } from "@convex-dev/agent";
-import { groq } from "@ai-sdk/groq";
 import { OPERATOR_MESSAGE_ENHANCEMENT_PROMPT } from "../system/ai/constants";
+import { limitError } from "../lib/entitlements";
 
 export const enhanceResponse = action({
   args: {
@@ -31,22 +32,26 @@ export const enhanceResponse = action({
       });
     }
 
-    const subscription = await ctx.runQuery(
-      internal.system.subscriptions.getByOrganizationId,
-      {
-        organizationId: orgId,
-      },
-    );
-
-    if (subscription?.status !== "active") {
+    if (!process.env.GROQ_API_KEY) {
       throw new ConvexError({
-        code: "BAD_REQUEST",
-        message: "Missing subscription"
+        code: "SERVICE_UNAVAILABLE",
+        message: "The AI provider is not configured (GROQ_API_KEY).",
       });
     }
 
+    const usage = await ctx.runMutation(internal.system.usage.consume, {
+      organizationId: orgId,
+      metric: "aiMessages",
+    });
+
+    if (!usage.allowed) {
+      throw new ConvexError(
+        limitError("AI message", usage.used, usage.limit, usage.resetsAt),
+      );
+    }
+
     const response = await generateText({
-      model: groq("llama-3.3-70b-versatile"),
+      model: chatModel(),
       messages: [
         {
           role: "system",

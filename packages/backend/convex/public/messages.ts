@@ -43,6 +43,13 @@ export const create = action({
       });
     }
 
+    if (conversation.contactSessionId !== contactSession._id) {
+      throw new ConvexError({
+        code: "UNAUTHORIZED",
+        message: "Conversation does not belong to this session",
+      });
+    }
+
     if (conversation.status === "resolved") {
       throw new ConvexError({
         code: "BAD_REQUEST",
@@ -55,35 +62,50 @@ export const create = action({
       contactSessionId: args.contactSessionId,
     });
 
-    const subscription = await ctx.runQuery(
-      internal.system.subscriptions.getByOrganizationId,
-      {
-        organizationId: conversation.organizationId,
-      },
-    );
-
-    const shouldTriggerAgent =
-      conversation.status === "unresolved" && subscription?.status === "active"
-
-    if (shouldTriggerAgent) {
-      await supportAgent.generateText(
-        ctx,
-        { threadId: args.threadId },
-        {
-          prompt: args.prompt,
-          tools: {
-            escalateConversationTool: escalateConversation,
-            resolveConversationTool: resolveConversation,
-            searchTool: search,
-          }
-        },
-      )
-    } else {
+    // Always store the visitor's message first so nothing is lost if the AI is
+    // unavailable or the plan's allowance is used up.
+    if (conversation.status !== "unresolved") {
       await saveMessage(ctx, components.agent, {
         threadId: args.threadId,
         prompt: args.prompt,
       });
+      return;
     }
+
+    if (!process.env.GROQ_API_KEY) {
+      await saveMessage(ctx, components.agent, { threadId: args.threadId, prompt: args.prompt });
+      await ctx.runMutation(internal.system.conversations.escalate, { threadId: args.threadId });
+      throw new ConvexError({
+        code: "SERVICE_UNAVAILABLE",
+        message: "The AI assistant is not configured. Your message was saved and a team member will reply.",
+      });
+    }
+
+    const usage = await ctx.runMutation(internal.system.usage.consume, {
+      organizationId: conversation.organizationId,
+      metric: "aiMessages",
+    });
+
+    if (!usage.allowed) {
+      // Over the plan's allowance: keep the message and hand over to a human
+      // instead of calling the model or dropping the customer.
+      await saveMessage(ctx, components.agent, { threadId: args.threadId, prompt: args.prompt });
+      await ctx.runMutation(internal.system.conversations.escalate, { threadId: args.threadId });
+      return;
+    }
+
+    await supportAgent.generateText(
+      ctx,
+      { threadId: args.threadId },
+      {
+        prompt: args.prompt,
+        tools: {
+          escalateConversationTool: escalateConversation,
+          resolveConversationTool: resolveConversation,
+          searchTool: search,
+        },
+      },
+    );
   },
 });
 
@@ -100,6 +122,18 @@ export const getMany = query({
       throw new ConvexError({
         code: "UNAUTHORIZED",
         message: "Invalid session",
+      });
+    }
+
+    const conversation = await ctx.db
+      .query("conversations")
+      .withIndex("by_thread_id", (q) => q.eq("threadId", args.threadId))
+      .unique();
+
+    if (!conversation || conversation.contactSessionId !== contactSession._id) {
+      throw new ConvexError({
+        code: "UNAUTHORIZED",
+        message: "Conversation does not belong to this session",
       });
     }
 

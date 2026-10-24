@@ -1,4 +1,4 @@
-import { groq } from "@ai-sdk/groq";
+import { chatModel } from "../models";
 import { createTool } from "@convex-dev/agent";
 import { generateText } from "ai";
 import z from "zod";
@@ -52,7 +52,7 @@ export const search = createTool({
           content: `User asked: "${args.query}"\n\nSearch results: ${contextText}`
         }
       ],
-      model: groq("llama-3.3-70b-versatile"),
+      model: chatModel(),
     });
 
     await supportAgent.saveMessage(ctx, {

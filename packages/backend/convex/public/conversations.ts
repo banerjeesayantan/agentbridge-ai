@@ -113,6 +113,14 @@ export const create = mutation({
       });
     }
 
+    // The client-supplied organization must be the one this session belongs to.
+    if (session.organizationId !== args.organizationId) {
+      throw new ConvexError({
+        code: "UNAUTHORIZED",
+        message: "Invalid organization for this session",
+      });
+    }
+
     // This refreshes the user's session if they are within the threshold
     await ctx.runMutation(internal.system.contactSessions.refresh, {
       contactSessionId: args.contactSessionId,
