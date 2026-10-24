@@ -40,9 +40,9 @@ http.route({
     const result = await ctx.runAction(internal.system.polarWebhook.handle, {
       body,
       headers: {
-        "webhook-id": request.headers.get("webhook-id") ?? "",
-        "webhook-timestamp": request.headers.get("webhook-timestamp") ?? "",
-        "webhook-signature": request.headers.get("webhook-signature") ?? "",
+        webhook_id: request.headers.get("webhook-id") ?? "",
+        webhook_timestamp: request.headers.get("webhook-timestamp") ?? "",
+        webhook_signature: request.headers.get("webhook-signature") ?? "",
       },
     });
     return new Response(null, { status: result.status });
@@ -65,6 +65,6 @@ async function validateRequest(req: Request): Promise<WebhookEvent | null> {
     console.error(`Error verifying webhook event`, error);
     return null;
   }
-};
+}
 
 export default http;

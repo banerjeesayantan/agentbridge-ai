@@ -14,24 +14,26 @@ export const handle = internalAction({
   args: {
     body: v.string(),
     headers: v.object({
-      "webhook-id": v.string(),
-      "webhook-timestamp": v.string(),
-      "webhook-signature": v.string(),
+      webhook_id: v.string(),
+      webhook_timestamp: v.string(),
+      webhook_signature: v.string(),
     }),
   },
   handler: async (ctx, args): Promise<{ status: number }> => {
     const secret = env("POLAR_WEBHOOK_SECRET");
     if (!secret) {
-      console.error("POLAR_WEBHOOK_SECRET is not configured; refusing webhook.");
+      console.error(
+        "POLAR_WEBHOOK_SECRET is not configured; refusing webhook.",
+      );
       return { status: 500 };
     }
 
     const valid = await verifyStandardWebhook(
       args.body,
       {
-        id: args.headers["webhook-id"],
-        timestamp: args.headers["webhook-timestamp"],
-        signature: args.headers["webhook-signature"],
+        id: args.headers.webhook_id,
+        timestamp: args.headers.webhook_timestamp,
+        signature: args.headers.webhook_signature,
       },
       secret,
     );
@@ -47,24 +49,40 @@ export const handle = internalAction({
 
     if (!event.type.startsWith("subscription.")) return { status: 200 };
 
-    const mapped = mapSubscriptionEvent(event.type, event.data, args.headers["webhook-id"], Date.now());
+    const mapped = mapSubscriptionEvent(
+      event.type,
+      event.data,
+      args.headers.webhook_id,
+      Date.now(),
+    );
     if (!mapped) {
-      console.warn("Ignoring Polar subscription event without a linked organization", event.type);
+      console.warn(
+        "Ignoring Polar subscription event without a linked organization",
+        event.type,
+      );
       return { status: 200 };
     }
     if (!mapped.plan) {
-      console.warn("Polar event for a product that is not mapped to a plan; it grants no paid access.", mapped.polarProductId);
+      console.warn(
+        "Polar event for a product that is not mapped to a plan; it grants no paid access.",
+        mapped.polarProductId,
+      );
     }
 
     try {
-      const result = await ctx.runMutation(internal.system.subscriptions.applyPolarEvent, {
-        ...mapped,
-        type: event.type,
-      });
+      const result = await ctx.runMutation(
+        internal.system.subscriptions.applyPolarEvent,
+        {
+          ...mapped,
+          type: event.type,
+        },
+      );
 
       if (result.applied && env("CLERK_SECRET_KEY")) {
         try {
-          const clerk = createClerkClient({ secretKey: env("CLERK_SECRET_KEY")! });
+          const clerk = createClerkClient({
+            secretKey: env("CLERK_SECRET_KEY")!,
+          });
           await clerk.organizations.updateOrganization(mapped.organizationId, {
             maxAllowedMemberships: result.memberCap,
           });
