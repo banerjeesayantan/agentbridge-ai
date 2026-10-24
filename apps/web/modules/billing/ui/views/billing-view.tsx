@@ -1,25 +1,24 @@
 "use client";
 
 import { PricingTable } from "../components/pricing-table";
+import { UsagePanel } from "../components/usage-panel";
 
 export const BillingView = () => {
   return (
-    <div className="flex min-h-full flex-col bg-muted p-8">
+    <div className="flex min-h-screen flex-col bg-muted p-8">
       <div className="mx-auto w-full max-w-screen-md">
         <div className="space-y-2">
-          <h1 className="text-2xl md:text-4xl">
-            Plans & Billing
-          </h1>
-
-          <p className="text-muted-foreground">
-            Choose the plan that's right for you.
+          <h1 className="text-2xl md:text-4xl">Plans & Billing</h1>
+          <p>
+            Choose the plan that&apos;s right for you
           </p>
         </div>
 
-        <div className="mt-8">
+        <div className="mt-8 space-y-8">
+          <UsagePanel />
           <PricingTable />
         </div>
       </div>
     </div>
-  );
-};
+  )
+}

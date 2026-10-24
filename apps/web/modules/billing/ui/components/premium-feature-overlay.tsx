@@ -87,9 +87,9 @@ export const PremiumFeatureOverlay = ({
                 <GemIcon className="size-6 text-muted-foreground" />
               </div>
             </div>
-            <CardTitle className="text-xl">Premium Feature</CardTitle>
+            <CardTitle className="text-xl">Upgrade to unlock</CardTitle>
             <CardDescription>
-              This feature requires a Pro subscription
+              This feature isn't included in your current plan
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -113,7 +113,7 @@ export const PremiumFeatureOverlay = ({
               onClick={() => router.push("/billing")}
               size="lg"
             >
-              View Plans
+              View plans
             </Button>
           </CardContent>
         </Card>

@@ -1,6 +1,8 @@
 "use client";
 
 import { useAction } from "convex/react";
+import { toast } from "sonner";
+import { getErrorMessage, isLimitError } from "@/modules/billing/errors";
 import { useState } from "react";
 import {
   Dialog,
@@ -73,6 +75,10 @@ export const UploadDialog = ({
       handleCancel();
     } catch (error) {
       console.error(error);
+      toast.error(
+        getErrorMessage(error, "The file couldn't be uploaded. Please try again.") +
+          (isLimitError(error) ? " See Plans & Billing to upgrade." : ""),
+      );
     } finally {
       setIsUploading(false);
     }
