@@ -1,20 +1,12 @@
-import { PremiumFeatureOverlay } from "@/modules/billing/ui/components/premium-feature-overlay";
+import { FeatureGate } from "@/modules/billing/ui/components/feature-gate";
 import { VapiView } from "@/modules/plugins/ui/views/vapi-view";
-import { Protect } from "@clerk/nextjs";
 
 const Page = () => {
   return (
-    <Protect
-      condition={(has) => has({ plan: "pro" })}
-      fallback={
-        <PremiumFeatureOverlay>
-          <VapiView />
-        </PremiumFeatureOverlay>
-      }
-    >
+    <FeatureGate feature="voice">
       <VapiView />
-    </Protect>
+    </FeatureGate>
   );
 };
- 
+
 export default Page;

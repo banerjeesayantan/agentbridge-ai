@@ -22,38 +22,30 @@ http.route({
     }
 
     switch (event.type) {
-      case "subscription.updated": {
-        const subscription = event.data as {
-          status: string;
-          payer?: {
-            organization_id: string;
-          }
-        };
-
-        const organizationId = subscription.payer?.organization_id;
-
-        if (!organizationId) {
-          return new Response("Missing Organization ID", { status: 400 });
-        }
-
-        const newMaxAllowedMemberships = subscription.status === "active" ? 5 : 1;
-
-        await clerkClient.organizations.updateOrganization(organizationId, {
-          maxAllowedMemberships: newMaxAllowedMemberships,
-        });
-
-        await ctx.runMutation(internal.system.subscriptions.upsert, {
-          organizationId,
-          status: subscription.status,
-        });
-
-        break;
-      }
+      // Subscriptions are managed by Polar (see /polar/webhook), not Clerk Billing.
       default:
         console.log("Ignored Clerk webhook event", event.type);
     }
 
     return new Response(null, { status: 200 });
+  }),
+});
+
+http.route({
+  path: "/polar/webhook",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    // The signature covers the exact bytes received, so read the raw body.
+    const body = await request.text();
+    const result = await ctx.runAction(internal.system.polarWebhook.handle, {
+      body,
+      headers: {
+        "webhook-id": request.headers.get("webhook-id") ?? "",
+        "webhook-timestamp": request.headers.get("webhook-timestamp") ?? "",
+        "webhook-signature": request.headers.get("webhook-signature") ?? "",
+      },
+    });
+    return new Response(null, { status: result.status });
   }),
 });
 

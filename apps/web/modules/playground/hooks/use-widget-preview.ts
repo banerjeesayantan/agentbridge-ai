@@ -104,21 +104,14 @@ export function useWidgetPreview() {
     const doc = iframeRef.current?.contentDocument;
     if (!win || !doc) return;
 
-    const frameConsole = (
-  win as Window & { console: Console }
-).console;
+    for (const level of ["warn", "error"] as const) {
+      const original = win.console[level].bind(win.console);
+      win.console[level] = (...args: unknown[]) => {
+        original(...args);
+        log(level, args.map((a) => (a instanceof Error ? a.message : String(a))).join(" "));
+      };
+    }
 
-for (const level of ["warn", "error"] as const) {
-  const original = frameConsole[level].bind(frameConsole);
-
-  frameConsole[level] = (...args: unknown[]) => {
-    original(...args);
-    log(
-      level,
-      args.map((a) => (a instanceof Error ? a.message : String(a))).join(" "),
-    );
-  };
-}
     setBundleStatus("loading");
     const script = doc.createElement("script");
     script.src = EMBED_SCRIPT_URL;
