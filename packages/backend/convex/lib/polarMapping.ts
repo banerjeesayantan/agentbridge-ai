@@ -7,7 +7,7 @@ export interface AppliedSubscriptionEvent {
   polarCustomerId?: string;
   polarProductId?: string;
   polarPriceId?: string;
-  plan?: "pro" | "business";
+  plan?: "pro" | "enterprise";
   status: string;
   interval?: string;
   currentPeriodStart?: number;
