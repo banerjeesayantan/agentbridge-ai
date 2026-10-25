@@ -34,6 +34,7 @@ import type * as public_conversations from "../public/conversations.js";
 import type * as public_messages from "../public/messages.js";
 import type * as public_organizations from "../public/organizations.js";
 import type * as public_secrets from "../public/secrets.js";
+import type * as public_voiceTrials from "../public/voiceTrials.js";
 import type * as public_widgetSettings from "../public/widgetSettings.js";
 import type * as system_ai_agents_supportAgent from "../system/ai/agents/supportAgent.js";
 import type * as system_ai_constants from "../system/ai/constants.js";
@@ -49,6 +50,7 @@ import type * as system_polarWebhook from "../system/polarWebhook.js";
 import type * as system_secrets from "../system/secrets.js";
 import type * as system_subscriptions from "../system/subscriptions.js";
 import type * as system_usage from "../system/usage.js";
+import type * as system_voiceTrials from "../system/voiceTrials.js";
 import type * as users from "../users.js";
 
 import type {
@@ -92,6 +94,7 @@ declare const fullApi: ApiFromModules<{
   "public/messages": typeof public_messages;
   "public/organizations": typeof public_organizations;
   "public/secrets": typeof public_secrets;
+  "public/voiceTrials": typeof public_voiceTrials;
   "public/widgetSettings": typeof public_widgetSettings;
   "system/ai/agents/supportAgent": typeof system_ai_agents_supportAgent;
   "system/ai/constants": typeof system_ai_constants;
@@ -107,6 +110,7 @@ declare const fullApi: ApiFromModules<{
   "system/secrets": typeof system_secrets;
   "system/subscriptions": typeof system_subscriptions;
   "system/usage": typeof system_usage;
+  "system/voiceTrials": typeof system_voiceTrials;
   users: typeof users;
 }>;
 declare const fullApiWithMounts: typeof fullApi;

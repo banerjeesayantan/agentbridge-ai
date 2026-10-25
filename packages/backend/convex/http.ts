@@ -1,31 +1,23 @@
 import { Webhook } from "svix";
-import { createClerkClient } from "@clerk/backend";
 import type { WebhookEvent } from "@clerk/backend";
 import { httpRouter } from "convex/server";
-import { httpAction } from "./_generated/server";
 import { internal } from "./_generated/api";
-
-const clerkClient = createClerkClient({
-  secretKey: process.env.CLERK_SECRET_KEY || "",
-});
+import { httpAction } from "./_generated/server";
 
 const http = httpRouter();
 
 http.route({
   path: "/clerk-webhook",
   method: "POST",
-  handler: httpAction(async (ctx, request) => {
+  handler: httpAction(async (_ctx, request) => {
     const event = await validateRequest(request);
 
     if (!event) {
       return new Response("Error occurred", { status: 400 });
     }
 
-    switch (event.type) {
-      // Subscriptions are managed by Polar (see /polar/webhook), not Clerk Billing.
-      default:
-        console.log("Ignored Clerk webhook event", event.type);
-    }
+    // Subscriptions are managed by Polar, not Clerk Billing.
+    console.log("Ignored Clerk webhook event", event.type);
 
     return new Response(null, { status: 200 });
   }),
@@ -35,34 +27,53 @@ http.route({
   path: "/polar/webhook",
   method: "POST",
   handler: httpAction(async (ctx, request) => {
-    // The signature covers the exact bytes received, so read the raw body.
     const body = await request.text();
-    const result = await ctx.runAction(internal.system.polarWebhook.handle, {
-      body,
-      headers: {
-        webhook_id: request.headers.get("webhook-id") ?? "",
-        webhook_timestamp: request.headers.get("webhook-timestamp") ?? "",
-        webhook_signature: request.headers.get("webhook-signature") ?? "",
+
+    const result = await ctx.runAction(
+      internal.system.polarWebhook.handle,
+      {
+        body,
+        headers: {
+          webhookId: request.headers.get("webhook-id") ?? "",
+          webhookTimestamp:
+            request.headers.get("webhook-timestamp") ?? "",
+          webhookSignature:
+            request.headers.get("webhook-signature") ?? "",
+        },
       },
-    });
+    );
+
     return new Response(null, { status: result.status });
   }),
 });
 
-async function validateRequest(req: Request): Promise<WebhookEvent | null> {
+async function validateRequest(
+  req: Request,
+): Promise<WebhookEvent | null> {
   const payloadString = await req.text();
+
   const svixHeaders = {
-    "svix-id": req.headers.get("svix-id") || "",
-    "svix-timestamp": req.headers.get("svix-timestamp") || "",
-    "svix-signature": req.headers.get("svix-signature") || "",
+    "svix-id": req.headers.get("svix-id") ?? "",
+    "svix-timestamp": req.headers.get("svix-timestamp") ?? "",
+    "svix-signature": req.headers.get("svix-signature") ?? "",
   };
 
-  const wh = new Webhook(process.env.CLERK_WEBHOOK_SECRET || "");
+  const secret = process.env.CLERK_WEBHOOK_SECRET;
+
+  if (!secret) {
+    console.error("CLERK_WEBHOOK_SECRET is not configured.");
+    return null;
+  }
+
+  const webhook = new Webhook(secret);
 
   try {
-    return wh.verify(payloadString, svixHeaders) as unknown as WebhookEvent;
+    return webhook.verify(
+      payloadString,
+      svixHeaders,
+    ) as WebhookEvent;
   } catch (error) {
-    console.error(`Error verifying webhook event`, error);
+    console.error("Error verifying Clerk webhook event", error);
     return null;
   }
 }

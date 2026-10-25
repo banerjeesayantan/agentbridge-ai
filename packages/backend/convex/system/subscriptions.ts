@@ -61,7 +61,7 @@ export const applyPolarEvent = internalMutation({
     polarCustomerId: v.optional(v.string()),
     polarProductId: v.optional(v.string()),
     polarPriceId: v.optional(v.string()),
-    plan: v.optional(v.union(v.literal("pro"), v.literal("business"))),
+    plan: v.optional(v.union(v.literal("pro"), v.literal("enterprise"))),
     status: v.string(),
     interval: v.optional(v.string()),
     currentPeriodStart: v.optional(v.number()),
