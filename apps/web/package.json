@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@clerk/nextjs": "^6.27.1",
+    "@clerk/nextjs": "^6.39.2",
     "@convex-dev/agent": "^0.1.16",
     "@hookform/resolvers": "^5.2.0",
     "@sentry/nextjs": "^9.47.2",
@@ -31,7 +31,7 @@
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.61.1",
     "sonner": "^2.0.6",
-    "zod": "3.25.67"
+    "zod": "4.6.6"
   },
   "devDependencies": {
     "@types/node": "^20",
