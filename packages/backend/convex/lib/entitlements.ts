@@ -7,7 +7,7 @@
  */
 import type { QueryCtx } from "../_generated/server";
 
-export const PLAN_KEYS = ["free", "pro", "business"] as const;
+export const PLAN_KEYS = ["free", "pro", "enterprise"] as const;
 export type PlanKey = (typeof PLAN_KEYS)[number];
 export type PaidPlanKey = Exclude<PlanKey, "free">;
 
@@ -23,10 +23,20 @@ export interface PlanLimits {
 }
 
 export const PLANS: Record<PlanKey, { name: string; limits: PlanLimits }> = {
-  free: { name: "Free", limits: { aiMessages: 100, knowledgeFiles: 5, voice: false, members: 1 } },
-  pro: { name: "Pro", limits: { aiMessages: 2000, knowledgeFiles: 100, voice: true, members: 5 } },
-  business: { name: "Business", limits: { aiMessages: 10000, knowledgeFiles: 500, voice: true, members: 15 } },
+  free: {
+    name: "Free",
+    limits: { aiMessages: 100, knowledgeFiles: 5, voice: false, members: 1 },
+  },
+  pro: {
+    name: "Pro",
+    limits: { aiMessages: 2000, knowledgeFiles: 100, voice: true, members: 5 },
+  },
+  enterprise: {
+    name: "Enterprise",
+    limits: { aiMessages: 10000, knowledgeFiles: 500, voice: true, members: 15 },
+  },
 };
+
 
 /** Keep paid access this long after a payment fails (status past_due). */
 export const PAST_DUE_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -57,7 +67,7 @@ export interface ResolvedEntitlements {
 }
 
 const isPaidPlan = (plan: string | undefined): plan is PaidPlanKey =>
-  plan === "pro" || plan === "business";
+  plan === "pro" || plan === "enterprise";
 
 /** Calendar month in UTC: the Free plan's usage period. */
 export function calendarMonth(now: number): { start: number; end: number } {

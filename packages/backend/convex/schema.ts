@@ -7,7 +7,7 @@ export default defineSchema({
     // Polar subscription status (active, trialing, past_due, canceled, revoked, ...)
     status: v.string(),
     // Normalized plan; absent/unknown always resolves to Free.
-    plan: v.optional(v.union(v.literal("pro"), v.literal("business"))),
+    plan: v.optional(v.union(v.literal("pro"), v.literal("enterprise"))),
     polarCustomerId: v.optional(v.string()),
     polarSubscriptionId: v.optional(v.string()),
     polarProductId: v.optional(v.string()),
@@ -99,6 +99,10 @@ export default defineSchema({
   })
   .index("by_organization_id", ["organizationId"])
   .index("by_expires_at", ["expiresAt"]),
+  voiceTrials: defineTable({
+    organizationId: v.string(),
+    usedAt: v.number(),
+  }).index("by_organization_id", ["organizationId"]),
   users: defineTable({
     name: v.string(),
   }),

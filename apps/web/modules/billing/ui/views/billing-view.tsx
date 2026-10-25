@@ -6,11 +6,11 @@ import { UsagePanel } from "../components/usage-panel";
 export const BillingView = () => {
   return (
     <div className="flex min-h-screen flex-col bg-muted p-8">
-      <div className="mx-auto w-full max-w-screen-md">
+      <div className="mx-auto w-full max-w-screen-lg">
         <div className="space-y-2">
           <h1 className="text-2xl md:text-4xl">Plans & Billing</h1>
-          <p>
-            Choose the plan that&apos;s right for you
+          <p className="text-muted-foreground">
+            Your usage, your plan, and what an upgrade adds.
           </p>
         </div>
 
@@ -20,5 +20,5 @@ export const BillingView = () => {
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
