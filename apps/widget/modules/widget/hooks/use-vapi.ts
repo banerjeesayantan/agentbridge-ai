@@ -1,27 +1,40 @@
+
 import Vapi from "@vapi-ai/web";
+import { useAction } from "convex/react";
 import { useAtomValue } from "jotai";
 import { useEffect, useState } from "react";
-import { vapiSecretsAtom, widgetSettingsAtom } from "../atoms/widget-atoms";
+import { api } from "@workspace/backend/_generated/api";
+import {
+  contactSessionIdAtomFamily,
+  organizationIdAtom,
+  vapiSecretsAtom,
+  widgetSettingsAtom,
+} from "../atoms/widget-atoms";
 
 interface TranscriptMessage {
   role: "user" | "assistant";
   text: string;
-};
+}
 
 export const useVapi = () => {
   const vapiSecrets = useAtomValue(vapiSecretsAtom);
   const widgetSettings = useAtomValue(widgetSettingsAtom);
+  const organizationId = useAtomValue(organizationIdAtom);
+  const contactSessionId = useAtomValue(
+    contactSessionIdAtomFamily(organizationId ?? "")
+  );
+
+  const authorizeVoice = useAction(api.public.voiceTrials.authorize);
 
   const [vapi, setVapi] = useState<Vapi | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
   const [transcript, setTranscript] = useState<TranscriptMessage[]>([]);
 
   useEffect(() => {
-    if (!vapiSecrets) {
-      return;
-    }
+    if (!vapiSecrets) return;
 
     const vapiInstance = new Vapi(vapiSecrets.publicApiKey);
     setVapi(vapiInstance);
@@ -38,51 +51,76 @@ export const useVapi = () => {
       setIsSpeaking(false);
     });
 
-    vapiInstance.on("speech-start", () => {
-      setIsSpeaking(true);
-    });
-
-    vapiInstance.on("speech-end", () => {
-      setIsSpeaking(false);
-    });
+    vapiInstance.on("speech-start", () => setIsSpeaking(true));
+    vapiInstance.on("speech-end", () => setIsSpeaking(false));
 
     vapiInstance.on("error", (error) => {
-      console.log(error, "VAPI_ERROR");
+      console.error(error, "VAPI_ERROR");
       setIsConnecting(false);
     });
 
     vapiInstance.on("message", (message) => {
-      if (message.type === "transcript" && message.transcriptType === "final") {
+      if (
+        message.type === "transcript" &&
+        message.transcriptType === "final"
+      ) {
         setTranscript((prev) => [
           ...prev,
           {
             role: message.role === "user" ? "user" : "assistant",
             text: message.transcript,
-          }
+          },
         ]);
       }
     });
 
     return () => {
-      vapiInstance?.stop();
-    }
-  }, []);
+      vapiInstance.stop();
+    };
+  }, [vapiSecrets]);
 
-  const startCall = () => {
-    if (!vapiSecrets || !widgetSettings?.vapiSettings?.assistantId) {
+  const startCall = async () => {
+    const assistantId = widgetSettings?.vapiSettings?.assistantId;
+
+    if (
+      !vapi ||
+      !vapiSecrets ||
+      !assistantId ||
+      !organizationId ||
+      !contactSessionId ||
+      isConnecting ||
+      isConnected
+    ) {
       return;
     }
+
     setIsConnecting(true);
 
-    if (vapi) {
-      vapi.start(widgetSettings.vapiSettings.assistantId);
+    try {
+      const result = await authorizeVoice({
+        organizationId,
+        contactSessionId,
+      });
+
+      if (!result.allowed) {
+        setShowPaywall(true);
+        setIsConnecting(false);
+        return;
+      }
+
+      await vapi.start(assistantId);
+    } catch (error) {
+      console.error(error, "VOICE_AUTHORIZATION_ERROR");
+      setIsConnecting(false);
     }
-  }
+  };
 
   const endCall = () => {
-    if (vapi) {
-      vapi.stop();
-    }
+    vapi?.stop();
+  };
+
+  const closePaywall = () => {
+    setShowPaywall(false);
   };
 
   return {
@@ -92,5 +130,7 @@ export const useVapi = () => {
     transcript,
     startCall,
     endCall,
-  }
+    showPaywall,
+    closePaywall,
+  };
 };
