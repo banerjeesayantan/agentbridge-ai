@@ -38,8 +38,8 @@ jobs:
       - name: Run backend policy tests
         run: pnpm test
 
-      - name: Typecheck backend
-        run: pnpm exec tsc --noEmit -p packages/backend/tsconfig.json
+      - name: Typecheck Convex backend
+        run: pnpm exec tsc --noEmit -p packages/backend/convex/tsconfig.json
 
       - name: Typecheck widget
         run: pnpm --filter widget typecheck
