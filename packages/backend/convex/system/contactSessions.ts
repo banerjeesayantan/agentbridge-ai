@@ -1,6 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { SESSION_DURATION_MS } from "../constants";
+import { normalizeContactDetails } from "../lib/contactSessionPolicy";
 
 const AUTO_REFRESH_THRESHOLD_MS = 4 * 60 * 60 * 1000;
 
@@ -30,25 +31,7 @@ export const create = internalMutation({
     metadata: metadataValidator,
   },
   handler: async (ctx, args) => {
-    const name = args.name.trim();
-    const email = args.email.trim().toLowerCase();
-
-    if (!name || name.length > 120) {
-      throw new ConvexError({
-        code: "BAD_REQUEST",
-        message: "Name must contain between 1 and 120 characters.",
-      });
-    }
-
-    if (
-      email.length > 254 ||
-      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
-    ) {
-      throw new ConvexError({
-        code: "BAD_REQUEST",
-        message: "A valid email address is required.",
-      });
-    }
+    const { name, email } = normalizeContactDetails(args.name, args.email);
 
     const now = Date.now();
     const expiresAt = now + SESSION_DURATION_MS;
