@@ -43,3 +43,6 @@ jobs:
 
       - name: Typecheck widget
         run: pnpm --filter widget typecheck
+
+      - name: Build all workspace packages
+        run: pnpm build
