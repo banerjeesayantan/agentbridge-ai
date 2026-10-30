@@ -4,7 +4,7 @@
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "convex/react";
+import { useAction } from "convex/react";
 import { useAtomValue, useSetAtom } from "jotai";
 import { MessageCircle } from "lucide-react";
 
@@ -42,7 +42,7 @@ export const WidgetAuthScreen = () => {
     contactSessionIdAtomFamily(organizationId || "")
   );
 
-  const createContactSession = useMutation(
+  const createContactSession = useAction(
     api.public.contactSessions.create
   );
 
