@@ -1,7 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import { internalMutation, internalQuery } from "../_generated/server";
 import { SESSION_DURATION_MS } from "../constants";
-import { normalizeContactDetails } from "../lib/contactSessionPolicy";
+import { isContactSessionActive, normalizeContactDetails } from "../lib/contactSessionPolicy";
 
 const AUTO_REFRESH_THRESHOLD_MS = 4 * 60 * 60 * 1000;
 
@@ -60,7 +60,7 @@ export const refresh = internalMutation({
       });
     }
 
-    if (contactSession.expiresAt < Date.now()) {
+    if (!isContactSessionActive(contactSession.expiresAt, Date.now())) {
       throw new ConvexError({
         code: "BAD_REQUEST",
         message: "Contact session expired",
