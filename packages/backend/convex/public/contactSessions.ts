@@ -2,6 +2,7 @@ import { createClerkClient } from "@clerk/backend";
 import { ConvexError, v } from "convex/values";
 import { internal } from "../_generated/api";
 import { action, mutation } from "../_generated/server";
+import { isContactSessionActive } from "../lib/contactSessionPolicy";
 
 const clerkSecretKey = process.env.CLERK_SECRET_KEY;
 const clerkClient = createClerkClient({
@@ -74,7 +75,7 @@ export const validate = mutation({
   handler: async (ctx, args) => {
     const contactSession = await ctx.db.get(args.contactSessionId);
 
-    if (!contactSession || contactSession.expiresAt <= Date.now()) {
+    if (!contactSession || !isContactSessionActive(contactSession.expiresAt, Date.now())) {
       return { valid: false };
     }
 
