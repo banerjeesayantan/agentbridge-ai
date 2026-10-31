@@ -2,14 +2,15 @@
 
 import { EMBED_SCRIPT_URL } from "@/modules/integrations/constants";
 import type { WidgetPosition } from "@/modules/integrations/utils";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { buildPreviewDocument } from "../preview-document";
 
 /**
- * `loading`      ΓÇô preview page or bundle still loading
- * `ready`        ΓÇô bundle loaded and window.AgentBridgeWidget is available
- * `missing-api`  ΓÇô bundle loaded but did not register the expected API
+ * `loading`      – preview page or bundle still loading
+ * `ready`        – bundle loaded and window.AgentBridgeWidget is available
+ * `missing-api`  – bundle loaded but did not register the expected API
  *                  (typically a stale widget.js that needs rebuilding)
- * `error`        ΓÇô the bundle URL could not be loaded
+ * `error`        – the bundle URL could not be loaded
  */
 export type BundleStatus = "loading" | "ready" | "missing-api" | "error";
 
@@ -31,41 +32,34 @@ export interface LogEntry {
 
 export type LastAction = "none" | "init" | "show" | "hide" | "destroy";
 
-interface WidgetApi {
-  init: (config?: { organizationId?: string; position?: WidgetPosition }) => boolean | void;
-  show: () => void;
-  hide: () => void;
-  destroy: () => void;
-  getState?: () => WidgetState;
-}
-
 const MAX_LOG_ENTRIES = 100;
-const POLL_INTERVAL_MS = 400;
+const RPC_TIMEOUT_MS = 4000;
 
-// A neutral stand-in for a customer's website. The real widget bundle is
-// injected into it so layout, z-index and viewport behaviour are genuine.
-export const PREVIEW_SRC_DOC = `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<style>
-  body{margin:0;font-family:system-ui,sans-serif;color:#475569;background:#fff}
-  header{padding:16px 24px;border-bottom:1px solid #e2e8f0;font-weight:600;color:#0f172a}
-  main{padding:24px;max-width:640px}
-  .bar{height:12px;border-radius:6px;background:#e2e8f0;margin:12px 0}
-  .bar.s{width:60%}.bar.m{width:80%}
-  p{font-size:13px;color:#94a3b8}
-</style></head>
-<body><header>Sample website</header>
-<main><div class="bar"></div><div class="bar m"></div><div class="bar s"></div><div class="bar"></div><div class="bar m"></div>
-<p>This page stands in for your site. The widget loads into it exactly as it would in production.</p></main></body></html>`;
+type Command = "init" | "show" | "hide" | "destroy";
+interface RpcResult {
+  ok: boolean;
+  result?: unknown;
+  error?: string;
+  state?: WidgetState | null;
+}
 
 const sameState = (a: WidgetState | null, b: WidgetState | null) =>
   a === b ||
   (!!a && !!b && a.initialized === b.initialized && a.open === b.open && a.position === b.position && a.organizationId === b.organizationId);
 
+/**
+ * Drives the sandboxed preview iframe over postMessage. The preview runs in an
+ * opaque origin (see preview-document.ts), so nothing here reaches into its
+ * window; every call is a request/response message, and only messages that
+ * come from that iframe's own window are accepted.
+ */
 export function useWidgetPreview() {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const logId = useRef(0);
+  const rpcId = useRef(0);
+  const pending = useRef(new Map<number, (r: RpcResult) => void>());
   const stateRef = useRef<WidgetState | null>(null);
+  const lastCommandAt = useRef(0);
 
   const [frameKey, setFrameKey] = useState(0);
   const [bundleStatus, setBundleStatus] = useState<BundleStatus>("loading");
@@ -74,163 +68,143 @@ export function useWidgetPreview() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [supportsState, setSupportsState] = useState(true);
 
+  const srcDoc = useMemo(() => buildPreviewDocument(EMBED_SCRIPT_URL), []);
+
   const log = useCallback((level: LogLevel, message: string) => {
-    setLogs((prev) =>
-      [...prev, { id: ++logId.current, at: new Date(), level, message }].slice(-MAX_LOG_ENTRIES),
-    );
+    setLogs((prev) => [...prev, { id: ++logId.current, at: new Date(), level, message }].slice(-MAX_LOG_ENTRIES));
   }, []);
 
-  const getApi = useCallback((): WidgetApi | null => {
-    const api = (iframeRef.current?.contentWindow as (Window & { AgentBridgeWidget?: WidgetApi }) | null | undefined)
-      ?.AgentBridgeWidget;
-    return api && typeof api.init === "function" ? api : null;
-  }, []);
-
-  // Pull the widget's real state. Returns it so callers can log accurate results.
-  const sync = useCallback((): WidgetState | null => {
-    const api = getApi();
-    const next = api && typeof api.getState === "function" ? api.getState() : null;
+  const applyState = useCallback((next: WidgetState | null) => {
     if (!sameState(stateRef.current, next)) {
       stateRef.current = next;
       setWidgetState(next);
     }
-    return next;
-  }, [getApi]);
+  }, []);
 
-  // Called when the sample page has loaded: forward its warnings/errors to the
-  // log, then load the real bundle into it.
-  const handleFrameLoad = useCallback(() => {
-    const win = iframeRef.current?.contentWindow;
-    const doc = iframeRef.current?.contentDocument;
-    if (!win || !doc) return;
-
-    const frameConsole = (win as Window & typeof globalThis).console;
-
-for (const level of ["warn", "error"] as const) {
-  const original = frameConsole[level].bind(frameConsole);
-
-  frameConsole[level] = (...args: unknown[]) => {
-    original(...args);
-    log(
-      level,
-      args.map((a) => (a instanceof Error ? a.message : String(a))).join(" "),
-    );
-  };
-}
-    setBundleStatus("loading");
-    const script = doc.createElement("script");
-    script.src = EMBED_SCRIPT_URL;
-    script.async = true;
-    script.onload = () => {
-      const api = getApi();
-      if (!api) {
-        setBundleStatus("missing-api");
-        log(
-          "error",
-          "Bundle loaded, but window.AgentBridgeWidget was not registered. The served widget.js is likely out of date: rebuild apps/embed and redeploy it.",
-        );
-        return;
-      }
-      setBundleStatus("ready");
-      setSupportsState(typeof api.getState === "function");
-      if (typeof api.getState !== "function") {
-        log("warn", "Bundle has no getState(); lifecycle badges cannot be verified. Rebuild apps/embed.");
-      }
-      log("success", "Widget bundle loaded.");
-      sync();
-    };
-    script.onerror = () => {
-      setBundleStatus("error");
-      log("error", `Could not load the widget bundle from ${new URL(EMBED_SCRIPT_URL, window.location.href).host}. Check the URL, network and CSP.`);
-    };
-    doc.body.appendChild(script);
-  }, [getApi, log, sync]);
-
-  // The widget can change itself (visitor clicks the launcher, widget asks to
-  // close), so observe it rather than trusting only our own calls.
+  // Messages from the preview. Accept only our own iframe's window.
   useEffect(() => {
-    if (bundleStatus !== "ready") return;
-    const id = window.setInterval(() => {
-      const before = stateRef.current;
-      const after = sync();
-      if (before && after && before.open !== after.open) {
-        log("info", after.open ? "Chat opened from the widget." : "Chat closed from the widget.");
-      }
-    }, POLL_INTERVAL_MS);
-    return () => window.clearInterval(id);
-  }, [bundleStatus, log, sync]);
+    const onMessage = (event: MessageEvent) => {
+      if (event.source !== iframeRef.current?.contentWindow) return;
+      const data = event.data as { __ab?: number; type?: string } & Record<string, any>;
+      if (!data || data.__ab !== 1) return;
 
-  const withApi = useCallback(
-    (name: string, fn: (api: WidgetApi) => void) => {
-      const api = getApi();
-      if (!api) {
-        log("error", `${name}() unavailable: the widget bundle is not ready.`);
+      switch (data.type) {
+        case "ready": {
+          const status = data.status as "ready" | "missing-api" | "error";
+          setBundleStatus(status);
+          if (status === "ready") {
+            setSupportsState(Boolean(data.hasGetState));
+            if (!data.hasGetState) log("warn", "Bundle has no getState(); lifecycle badges cannot be verified. Rebuild apps/embed.");
+            log("success", "Widget bundle loaded.");
+          } else if (status === "missing-api") {
+            log("error", "Bundle loaded, but window.AgentBridgeWidget was not registered. The served widget.js is likely out of date: rebuild apps/embed and redeploy it.");
+          } else {
+            let host = EMBED_SCRIPT_URL;
+            try { host = new URL(EMBED_SCRIPT_URL, window.location.href).host; } catch {}
+            log("error", `Could not load the widget bundle from ${host}. Check the URL, network and CSP.`);
+          }
+          break;
+        }
+        case "result": {
+          const resolve = pending.current.get(data.id);
+          if (resolve) {
+            pending.current.delete(data.id);
+            resolve({ ok: !!data.ok, result: data.result, error: data.error, state: data.state ?? null });
+          }
+          break;
+        }
+        case "state": {
+          const before = stateRef.current;
+          const next = (data.state ?? null) as WidgetState | null;
+          applyState(next);
+          // Only narrate changes the widget made itself (visitor clicked, widget asked to close).
+          if (before && next && before.open !== next.open && Date.now() - lastCommandAt.current > 800) {
+            log("info", next.open ? "Chat opened from the widget." : "Chat closed from the widget.");
+          }
+          break;
+        }
+        case "log": {
+          const level = data.level === "error" ? "error" : "warn";
+          log(level, String(data.message ?? "").slice(0, 500));
+          break;
+        }
+      }
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [applyState, log]);
+
+  const call = useCallback((cmd: Command, args?: unknown): Promise<RpcResult> => {
+    const win = iframeRef.current?.contentWindow;
+    if (!win) return Promise.resolve({ ok: false, error: "preview-unavailable" });
+    const id = ++rpcId.current;
+    lastCommandAt.current = Date.now();
+    return new Promise<RpcResult>((resolve) => {
+      const timer = window.setTimeout(() => {
+        pending.current.delete(id);
+        resolve({ ok: false, error: "timeout" });
+      }, RPC_TIMEOUT_MS);
+      pending.current.set(id, (r) => {
+        window.clearTimeout(timer);
+        resolve(r);
+      });
+      // Opaque-origin target, so "*" is required; the payload holds only the public org ID and position.
+      win.postMessage({ __ab: 1, id, cmd, args }, "*");
+    });
+  }, []);
+
+  const run = useCallback(
+    async (name: Command, args: unknown, onOk: (r: RpcResult) => void) => {
+      const r = await call(name, args);
+      if (r.state !== undefined) applyState(r.state ?? null);
+      if (!r.ok) {
+        log("error", `${name}() failed: ${r.error === "bundle-not-ready" ? "the widget bundle is not ready." : r.error ?? "unknown error"}`);
         return;
       }
-      try {
-        fn(api);
-      } catch (error) {
-        log("error", `${name}() threw: ${error instanceof Error ? error.message : String(error)}`);
-      }
+      onOk(r);
     },
-    [getApi, log],
+    [applyState, call, log],
   );
 
   const init = useCallback(
     (organizationId: string, position: WidgetPosition) => {
       setLastAction("init");
-      withApi("init", (api) => {
-        const result = api.init({ organizationId, position });
-        const state = sync();
-        if (result === false || (state && !state.initialized)) {
+      void run("init", { organizationId, position }, (r) => {
+        if (r.result === false || (r.state && !r.state.initialized)) {
           log("error", "init() rejected the configuration. See the preview errors above.");
         } else {
           log("success", `Initialized (position: ${position}).`);
         }
       });
     },
-    [log, sync, withApi],
+    [log, run],
   );
 
   const show = useCallback(() => {
     setLastAction("show");
-    withApi("show", (api) => {
-      api.show();
-      const state = sync();
-      log(state && !state.open ? "warn" : "info", state && !state.open ? "show() had no effect." : "Chat opened.");
+    void run("show", undefined, (r) => {
+      const noEffect = r.state && !r.state.open;
+      log(noEffect ? "warn" : "info", noEffect ? "show() had no effect." : "Chat opened.");
     });
-  }, [log, sync, withApi]);
+  }, [log, run]);
 
   const hide = useCallback(() => {
     setLastAction("hide");
-    withApi("hide", (api) => {
-      api.hide();
-      sync();
-      log("info", "Chat hidden (launcher stays mounted).");
-    });
-  }, [log, sync, withApi]);
+    void run("hide", undefined, () => log("info", "Chat hidden (launcher stays mounted)."));
+  }, [log, run]);
 
   const destroy = useCallback(() => {
     setLastAction("destroy");
-    withApi("destroy", (api) => {
-      api.destroy();
-      sync();
-      log("info", "Widget destroyed and removed from the page.");
-    });
-  }, [log, sync, withApi]);
+    void run("destroy", undefined, () => log("info", "Widget destroyed and removed from the page."));
+  }, [log, run]);
 
-  // Re-apply position to a live widget; the embed rebuilds it and keeps the
-  // open/closed state.
+  // Re-apply position to a live widget; the embed rebuilds it and keeps the open state.
   const applyPosition = useCallback(
     (position: WidgetPosition) => {
       if (!stateRef.current?.initialized) return;
-      withApi("init", (api) => {
-        api.init({ position });
-        sync();
-        log("info", `Position changed to ${position}.`);
-      });
+      void run("init", { position }, () => log("info", `Position changed to ${position}.`));
     },
-    [log, sync, withApi],
+    [log, run],
   );
 
   const reload = useCallback(() => {
@@ -247,7 +221,7 @@ for (const level of ["warn", "error"] as const) {
   return {
     iframeRef,
     frameKey,
-    handleFrameLoad,
+    srcDoc,
     bundleStatus,
     widgetState,
     lastAction,

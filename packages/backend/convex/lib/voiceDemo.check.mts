@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
-import { chargedSeconds, isSuccessfulSession, periodKey, pickProvider, readConfig, remaining } from "./voiceDemo.ts";
-
+import { chargedSeconds, isSuccessfulSession, periodKey, pickProvider, readConfig, remaining } from "./voiceDemo";
 const base = { VOICE_DEMO_ENABLED: "true", VOICE_DEMO_GLOBAL_BUDGET_SECONDS: "1000", VOICE_DEMO_VAPI_BUDGET_SECONDS: "400", VOICE_DEMO_MAX_SESSION_SECONDS: "180" };
 const cfg = readConfig(base);
 const ok = new Set(["vapi"] as const);

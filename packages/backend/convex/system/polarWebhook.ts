@@ -1,3 +1,4 @@
+
 import { createClerkClient } from "@clerk/backend";
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
@@ -5,10 +6,15 @@ import { internalAction } from "../_generated/server";
 import { mapSubscriptionEvent } from "../lib/polarMapping";
 import { verifyStandardWebhook } from "../lib/standardWebhooks";
 
+/**
+ * Verifies a Polar webhook using Standard Webhooks HMAC over the raw body,
+ * then applies the subscription event.
+ */
 export const handle = internalAction({
   args: {
     body: v.string(),
     headers: v.object({
+      // Convex validator keys must be valid identifiers.
       webhookId: v.string(),
       webhookTimestamp: v.string(),
       webhookSignature: v.string(),
@@ -39,18 +45,25 @@ export const handle = internalAction({
       return { status: 403 };
     }
 
-    let event: { type: string; data: unknown };
+    let event: { type?: unknown; data?: unknown };
 
     try {
-      event = JSON.parse(args.body);
+      const parsed: unknown = JSON.parse(args.body);
+
+      if (!parsed || typeof parsed !== "object") {
+        return { status: 400 };
+      }
+
+      event = parsed as { type?: unknown; data?: unknown };
     } catch {
       return { status: 400 };
     }
 
-    if (typeof event?.type !== "string") {
+    if (typeof event.type !== "string") {
       return { status: 400 };
     }
 
+    // This handler processes subscription events only.
     if (!event.type.startsWith("subscription.")) {
       return { status: 200 };
     }
@@ -72,7 +85,7 @@ export const handle = internalAction({
 
     if (!mapped.plan) {
       console.warn(
-        "Polar event for a product that is not mapped to a plan; it grants no paid access.",
+        "Polar event for an unmapped product; no paid access is granted.",
         mapped.polarProductId,
       );
     }
@@ -86,6 +99,8 @@ export const handle = internalAction({
         },
       );
 
+      // Clerk membership limits are synchronized after entitlements are stored.
+      // A Clerk API failure should not undo an already-applied subscription event.
       const clerkSecret = env("CLERK_SECRET_KEY");
 
       if (result.applied && clerkSecret) {
@@ -115,5 +130,5 @@ export const handle = internalAction({
 
 function env(name: string): string | undefined {
   const value = process.env[name];
-  return value && value.trim() ? value : undefined;
+  return value?.trim() ? value : undefined;
 }

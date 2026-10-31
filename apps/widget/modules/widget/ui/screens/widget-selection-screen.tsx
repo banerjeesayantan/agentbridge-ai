@@ -5,9 +5,9 @@ import { Button } from "@workspace/ui/components/button";
 import { useAtomValue, useSetAtom } from "jotai";
 import { ChevronRightIcon, MessageSquareTextIcon, MicIcon, PhoneIcon } from "lucide-react";
 import { contactSessionIdAtomFamily, conversationIdAtom, errorMessageAtom, hasVapiSecretsAtom, organizationIdAtom, screenAtom, widgetSettingsAtom } from "../../atoms/widget-atoms";
-import { useMutation } from "convex/react";
+import { useAction, useMutation } from "convex/react";
 import { api } from "@workspace/backend/_generated/api";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { WidgetFooter } from "../components/widget-footer";
 
 export const WidgetSelectionScreen = () => {
@@ -24,6 +24,20 @@ export const WidgetSelectionScreen = () => {
 
   const createConversation = useMutation(api.public.conversations.create);
   const [isPending, setIsPending] = useState(false);
+
+  // Free organizations can be offered the one-time voice demo; the server decides.
+  const getEligibility = useAction(api.public.voiceDemo.getEligibility);
+  const [demoOffered, setDemoOffered] = useState(false);
+  useEffect(() => {
+    if (!contactSessionId) return;
+    let cancelled = false;
+    getEligibility({ contactSessionId })
+      .then(({ state }) => !cancelled && setDemoOffered(state === "available" || state === "trial_used" || state === "attempts_exceeded"))
+      .catch(() => !cancelled && setDemoOffered(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [contactSessionId, getEligibility]);
 
   const handleNewConversation = async () => {
     if (!organizationId) {
@@ -78,7 +92,7 @@ export const WidgetSelectionScreen = () => {
           </div>
           <ChevronRightIcon />
         </Button>
-        {hasVapiSecrets && widgetSettings?.vapiSettings?.assistantId && (
+        {((hasVapiSecrets && widgetSettings?.vapiSettings?.assistantId) || demoOffered) && (
           <Button
             className="h-16 w-full justify-between"
             variant="outline"
