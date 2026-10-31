@@ -12,7 +12,8 @@ export const authorize = internalMutation({
   handler: async (ctx, args) => {
     const now = Date.now();
 
-    // Verify that this contact session belongs to this organization.
+    // Verify that the contact session belongs to this organization
+    // and has not expired.
     const session = await ctx.db.get(args.contactSessionId);
 
     if (
@@ -24,17 +25,21 @@ export const authorize = internalMutation({
     }
 
     // Existing paid entitlements take priority over the free trial.
-    const entitlements = await getEntitlements(ctx, args.organizationId, now);
+    const entitlements = await getEntitlements(
+      ctx,
+      args.organizationId,
+      now,
+    );
 
     if (entitlements.limits.voice) {
       return { allowed: true, reason: "paid" as const };
     }
 
-    // Free organizations receive one trial per organization.
+    // Free organizations receive one successful trial per organization.
     const existingTrial = await ctx.db
       .query("voiceTrials")
       .withIndex("by_organization_id", (q) =>
-        q.eq("organizationId", args.organizationId)
+        q.eq("organizationId", args.organizationId),
       )
       .unique();
 
@@ -42,10 +47,9 @@ export const authorize = internalMutation({
       return { allowed: false, reason: "trial_used" as const };
     }
 
-    await ctx.db.insert("voiceTrials", {
-      organizationId: args.organizationId,
-      usedAt: now,
-    });
+    // Do not insert a voiceTrials record here:
+    // no successful voice session exists yet.
+    // The session completion flow records the trial using its sessionId.
 
     return { allowed: true, reason: "trial" as const };
   },

@@ -9,7 +9,9 @@
  */
 
 import type * as constants from "../constants.js";
+import type * as crons from "../crons.js";
 import type * as http from "../http.js";
+import type * as lib_Subscriptionevents from "../lib/Subscriptionevents.js";
 import type * as lib_entitlements from "../lib/entitlements.js";
 import type * as lib_extractTextContent from "../lib/extractTextContent.js";
 import type * as lib_knowledgeFiles from "../lib/knowledgeFiles.js";
@@ -18,10 +20,12 @@ import type * as lib_polarConfig from "../lib/polarConfig.js";
 import type * as lib_polarMapping from "../lib/polarMapping.js";
 import type * as lib_secrets from "../lib/secrets.js";
 import type * as lib_standardWebhooks from "../lib/standardWebhooks.js";
+import type * as lib_voiceDemo from "../lib/voiceDemo.js";
 import type * as playground from "../playground.js";
 import type * as private_billing from "../private/billing.js";
 import type * as private_contactSessions from "../private/contactSessions.js";
 import type * as private_conversations from "../private/conversations.js";
+import type * as private_feedback from "../private/feedback.js";
 import type * as private_files from "../private/files.js";
 import type * as private_messages from "../private/messages.js";
 import type * as private_plugins from "../private/plugins.js";
@@ -31,9 +35,11 @@ import type * as private_vapi from "../private/vapi.js";
 import type * as private_widgetSettings from "../private/widgetSettings.js";
 import type * as public_contactSessions from "../public/contactSessions.js";
 import type * as public_conversations from "../public/conversations.js";
+import type * as public_feedback from "../public/feedback.js";
 import type * as public_messages from "../public/messages.js";
 import type * as public_organizations from "../public/organizations.js";
 import type * as public_secrets from "../public/secrets.js";
+import type * as public_voiceDemo from "../public/voiceDemo.js";
 import type * as public_voiceTrials from "../public/voiceTrials.js";
 import type * as public_widgetSettings from "../public/widgetSettings.js";
 import type * as system_ai_agents_supportAgent from "../system/ai/agents/supportAgent.js";
@@ -50,6 +56,7 @@ import type * as system_polarWebhook from "../system/polarWebhook.js";
 import type * as system_secrets from "../system/secrets.js";
 import type * as system_subscriptions from "../system/subscriptions.js";
 import type * as system_usage from "../system/usage.js";
+import type * as system_voiceDemo from "../system/voiceDemo.js";
 import type * as system_voiceTrials from "../system/voiceTrials.js";
 import type * as users from "../users.js";
 
@@ -69,7 +76,9 @@ import type {
  */
 declare const fullApi: ApiFromModules<{
   constants: typeof constants;
+  crons: typeof crons;
   http: typeof http;
+  "lib/Subscriptionevents": typeof lib_Subscriptionevents;
   "lib/entitlements": typeof lib_entitlements;
   "lib/extractTextContent": typeof lib_extractTextContent;
   "lib/knowledgeFiles": typeof lib_knowledgeFiles;
@@ -78,10 +87,12 @@ declare const fullApi: ApiFromModules<{
   "lib/polarMapping": typeof lib_polarMapping;
   "lib/secrets": typeof lib_secrets;
   "lib/standardWebhooks": typeof lib_standardWebhooks;
+  "lib/voiceDemo": typeof lib_voiceDemo;
   playground: typeof playground;
   "private/billing": typeof private_billing;
   "private/contactSessions": typeof private_contactSessions;
   "private/conversations": typeof private_conversations;
+  "private/feedback": typeof private_feedback;
   "private/files": typeof private_files;
   "private/messages": typeof private_messages;
   "private/plugins": typeof private_plugins;
@@ -91,9 +102,11 @@ declare const fullApi: ApiFromModules<{
   "private/widgetSettings": typeof private_widgetSettings;
   "public/contactSessions": typeof public_contactSessions;
   "public/conversations": typeof public_conversations;
+  "public/feedback": typeof public_feedback;
   "public/messages": typeof public_messages;
   "public/organizations": typeof public_organizations;
   "public/secrets": typeof public_secrets;
+  "public/voiceDemo": typeof public_voiceDemo;
   "public/voiceTrials": typeof public_voiceTrials;
   "public/widgetSettings": typeof public_widgetSettings;
   "system/ai/agents/supportAgent": typeof system_ai_agents_supportAgent;
@@ -110,6 +123,7 @@ declare const fullApi: ApiFromModules<{
   "system/secrets": typeof system_secrets;
   "system/subscriptions": typeof system_subscriptions;
   "system/usage": typeof system_usage;
+  "system/voiceDemo": typeof system_voiceDemo;
   "system/voiceTrials": typeof system_voiceTrials;
   users: typeof users;
 }>;

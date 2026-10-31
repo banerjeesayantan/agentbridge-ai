@@ -35,8 +35,8 @@ import { useState } from "react";
 import { EMBED_SCRIPT_URL, INTEGRATIONS, type IntegrationId } from "@/modules/integrations/constants";
 import { createScript, type WidgetPosition } from "@/modules/integrations/utils";
 import { CodeBlock } from "@/modules/integrations/ui/components/code-block";
+import { UsageStrip } from "@/modules/billing/ui/components/usage-strip";
 import {
-  PREVIEW_SRC_DOC,
   useWidgetPreview,
   type BundleStatus,
   type LogLevel,
@@ -134,6 +134,7 @@ export const PlaygroundView = () => {
           {widgetBadge && <StatusBadge tone={widgetBadge.tone}>{widgetBadge.text}</StatusBadge>}
         </div>
       </header>
+      <UsageStrip />
 
       <div className="grid flex-1 gap-4 p-4 lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_400px]">
         {/* Preview canvas */}
@@ -209,9 +210,11 @@ export const PlaygroundView = () => {
               <iframe
                 className="size-full min-h-[420px] bg-white"
                 key={preview.frameKey}
-                onLoad={preview.handleFrameLoad}
                 ref={preview.iframeRef}
-                srcDoc={PREVIEW_SRC_DOC}
+                // No allow-same-origin: the preview and the widget script run in an
+                // opaque origin and cannot reach the dashboard's session or storage.
+                sandbox="allow-scripts"
+                srcDoc={preview.srcDoc}
                 title="Widget preview on a sample website"
               />
             </div>

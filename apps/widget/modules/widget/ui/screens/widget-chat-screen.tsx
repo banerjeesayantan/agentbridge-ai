@@ -34,6 +34,7 @@ import {
 } from "@workspace/ui/components/ai/message";
 import { AIResponse } from "@workspace/ui/components/ai/response";
 import { useMemo } from "react";
+import { MessageFeedback } from "../components/message-feedback";
 
 const formSchema = z.object({
   message: z.string().min(1, "Message is required"),
@@ -75,6 +76,17 @@ export const WidgetChatScreen = () => {
           contactSessionId,
         } 
       : "skip"
+  );
+
+  const savedFeedback = useQuery(
+    api.public.feedback.getForConversation,
+    conversationId && contactSessionId
+      ? { conversationId, contactSessionId }
+      : "skip",
+  );
+  const ratingByMessage = useMemo(
+    () => new Map((savedFeedback ?? []).map((f) => [f.messageId, f.rating])),
+    [savedFeedback],
   );
 
   const messages = useThreadMessages(
@@ -152,6 +164,17 @@ export const WidgetChatScreen = () => {
               >
                 <AIMessageContent>
                   <AIResponse>{message.content}</AIResponse>
+                  {message.role === "assistant" &&
+                    message.content?.trim() &&
+                    conversation &&
+                    contactSessionId && (
+                      <MessageFeedback
+                        contactSessionId={contactSessionId}
+                        conversationId={conversation._id}
+                        messageId={message.id}
+                        rating={ratingByMessage.get(message.id)}
+                      />
+                    )}
                 </AIMessageContent>
                 {message.role === "assistant" && (
                   <DicebearAvatar

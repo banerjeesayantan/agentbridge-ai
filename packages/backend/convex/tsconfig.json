@@ -9,6 +9,7 @@
     "strict": true,
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
+    "allowImportingTsExtensions": true,
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
 

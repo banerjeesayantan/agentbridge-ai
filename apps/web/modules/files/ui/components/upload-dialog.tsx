@@ -2,7 +2,8 @@
 
 import { useAction } from "convex/react";
 import { toast } from "sonner";
-import { getErrorMessage, isLimitError } from "@/modules/billing/errors";
+import { getErrorData, getErrorMessage, isLimitError } from "@/modules/billing/errors";
+import { UpgradeWall } from "@/modules/billing/ui/components/upgrade-wall";
 import { useState } from "react";
 import {
   Dialog,
@@ -37,6 +38,8 @@ export const UploadDialog = ({
 
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [wallOpen, setWallOpen] = useState(false);
+  const [wallReason, setWallReason] = useState<string | null>(null);
   const [uploadForm, setUploadForm] = useState({
     category: "",
     filename: "",
@@ -75,10 +78,12 @@ export const UploadDialog = ({
       handleCancel();
     } catch (error) {
       console.error(error);
-      toast.error(
-        getErrorMessage(error, "The file couldn't be uploaded. Please try again.") +
-          (isLimitError(error) ? " See Plans & Billing to upgrade." : ""),
-      );
+      if (isLimitError(error)) {
+        setWallReason(getErrorData(error)?.message ?? null);
+        setWallOpen(true);
+      } else {
+        toast.error(getErrorMessage(error, "The file couldn't be uploaded. Please try again."));
+      }
     } finally {
       setIsUploading(false);
     }
@@ -94,6 +99,8 @@ export const UploadDialog = ({
   };
 
   return (
+    <>
+    <UpgradeWall onOpenChange={setWallOpen} open={wallOpen} reason={wallReason ?? undefined} />
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
@@ -175,5 +182,6 @@ export const UploadDialog = ({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    </>
   );
 };

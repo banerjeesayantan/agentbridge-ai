@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation } from "../_generated/server";
+import type { Id } from "../_generated/dataModel";
 import { SESSION_DURATION_MS } from "../constants";
 
 export const create = mutation({
@@ -24,7 +25,7 @@ export const create = mutation({
       })
     ),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<Id<"contactSessions">> => {
     const now = Date.now();
     const expiresAt = now + SESSION_DURATION_MS;
 

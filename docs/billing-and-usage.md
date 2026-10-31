@@ -29,3 +29,50 @@
 
 ## Test checklist (sandbox)
 Free org: upload 5 files, 6th fails with a clear message; send 100 widget messages, 101st is saved + escalated. Upgrade with a Polar sandbox card (`4242 4242 4242 4242`): plan flips only after the webhook. Replay the same webhook: no change. Cancel in the portal: plan stays until period end. Second organization cannot see the first's conversations/files.
+
+## Feedback (Phase 4)
+Customers rate each AI answer (thumbs up/down + optional comment) in the widget. Ratings are stored per organization (`feedback` table, one rating per message, re-rating replaces it) and shown at `/feedback`: positive/negative share and recent items (Free: counts + last 5 ratings; Pro and above: comments, last 50, CSV export, enforced in the backend). Not built: a "neutral" bucket (the widget only offers up/down) and "most common issues" (needs topic classification, which this version deliberately doesn't attempt).
+
+## Free embeddings (Phases 10-11)
+Set `EMBEDDING_PROVIDER=google` and `GOOGLE_GENERATIVE_AI_API_KEY` (free Gemini API key) in Convex env to use `gemini-embedding-001` at 1536 dimensions, matching the existing index. Default stays OpenAI so nothing breaks. **Re-upload all knowledge files after switching.** A fully local model is not a good fit for Convex cloud (no local runtime or persistent model cache); it would need a separate embedding service you host (e.g. Ollama) reachable from Convex, which is a larger change not made here. Free-tier terms (rate limits, whether free-tier data may be used by Google) should be checked against Google's current terms before using real customer documents.
+
+## Demo script
+Free org -> upload docs at Knowledge Base -> ask the widget in the Playground a product question (answer comes from your docs) -> ask something unrelated (it declines and offers a human) -> thumbs up/down an answer -> see it at Feedback -> watch AI messages and files fill on the main page -> hit a limit (upload wall / AI hands over to a human) -> Billing -> Upgrade -> Polar sandbox checkout -> plan flips to Pro only after the webhook.
+
+---
+
+## Free-plan voice demo (one trial, budget-capped)
+
+Free organizations get **one successful voice trial, ever**. Paid plans that include voice keep using the organization's own Vapi setup (Voice Assistant page → AWS-stored keys), which costs the developer nothing.
+
+### How it works
+1. The widget calls `public.voiceDemo.start` with its contact session. The server checks: valid session → real Clerk organization → plan → trial not used → attempt cap → capacity.
+2. Capacity is **reserved atomically** (Convex mutations are serialized) against a per-provider budget and a global budget. No capacity ⇒ the call is refused and nothing starts.
+3. The widget starts the call through a provider adapter (`apps/widget/modules/widget/voice/`). If the provider fails **before** the call connects, the server releases that reservation and moves to the next eligible provider. A connected call is never switched.
+4. The trial is consumed only when the session **succeeds**: connected, ≥ `VOICE_DEMO_MIN_SUCCESS_SECONDS` (server-measured, default 20s), ≥ `VOICE_DEMO_MIN_USER_TURNS` visitor turns (default 1), no provider error. A start attempt alone never consumes it.
+5. Budget is charged from **server-measured** time, capped at the reservation. A call that connects but is never reported is charged in full and counts as an attempt (cap: `VOICE_DEMO_MAX_ATTEMPTS_PER_ORG`, default 5) but does not consume the trial.
+6. A cron (`convex/crons.ts`, every 5 minutes) releases abandoned reservations.
+
+### Configuration: set in the **Convex dashboard → Settings → Environment Variables** (server-side)
+| Variable | Required | Purpose |
+|---|---|---|
+| `VOICE_DEMO_ENABLED` | yes | must be exactly `true`; otherwise the demo is off |
+| `VOICE_DEMO_GLOBAL_BUDGET_SECONDS` | yes | hard cap across all providers. **Unset = 0 = deny** |
+| `VOICE_DEMO_VAPI_BUDGET_SECONDS` | yes | cap for Vapi. **Unset = 0 = deny** |
+| `VAPI_DEMO_PUBLIC_KEY` | yes | the developer's Vapi **public** key (browser-safe by design) |
+| `VAPI_DEMO_ASSISTANT_ID` | yes | the demo assistant. Set `maxDurationSeconds` on it ≤ `VOICE_DEMO_MAX_SESSION_SECONDS` |
+| `CLERK_SECRET_KEY` | yes (already used) | verifies the organization exists; missing ⇒ deny |
+| `VOICE_DEMO_PROVIDER_ORDER` | no | default `vapi`; unknown names are ignored |
+| `VOICE_DEMO_MAX_SESSION_SECONDS` | no | default 180 |
+| `VOICE_DEMO_MIN_SUCCESS_SECONDS` / `VOICE_DEMO_MIN_USER_TURNS` | no | success criteria, defaults 20 / 1 |
+| `VOICE_DEMO_MAX_ATTEMPTS_PER_ORG` / `VOICE_DEMO_MAX_FALLBACKS` | no | defaults 5 / 2 |
+| `VOICE_DEMO_BUDGET_PERIOD` | no | `total` (default, lifetime) or `monthly` |
+
+No private provider key is needed by this design: the browser Vapi SDK uses only the public key. Do **not** put any of these in `NEXT_PUBLIC_*` variables. The existing tenant flow still uses `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (Convex env) with permissions `secretsmanager:CreateSecret`, `PutSecretValue`, `GetSecretValue` on `tenant/*`.
+
+### Honest limits
+- **Budgets are configured numbers, not provider balances.** Set them below what you are willing to spend. Vapi has no hard free tier I could verify; check your Vapi account's credits and billing before enabling, and keep auto-recharge off.
+- A Vapi public key can start calls on its assistant from anywhere. Our quota governs the widget path only. In the Vapi dashboard restrict the key's allowed origins and cap the assistant's `maxDurationSeconds`.
+- Only **Vapi** has an adapter. LiveKit, ElevenLabs etc. are intentionally not added: none was verified for free-tier terms or API compatibility here. Adding one = a new adapter in `voice/` + a server-side entry in `lib/voiceDemo.ts` (`IMPLEMENTED_PROVIDERS`, config, budget).
+- Paid-plan **voice-minute limits are not implemented** (voice is a yes/no plan feature; paid usage runs on the tenant's own Vapi account).
+- Attackers could create many real Clerk organizations to claim many trials; the global budget is the backstop.
