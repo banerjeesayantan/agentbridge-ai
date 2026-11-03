@@ -20,6 +20,7 @@ import type * as lib_polarConfig from "../lib/polarConfig.js";
 import type * as lib_polarMapping from "../lib/polarMapping.js";
 import type * as lib_secrets from "../lib/secrets.js";
 import type * as lib_standardWebhooks from "../lib/standardWebhooks.js";
+import type * as lib_vapiReport from "../lib/vapiReport.js";
 import type * as lib_voiceDemo from "../lib/voiceDemo.js";
 import type * as playground from "../playground.js";
 import type * as private_billing from "../private/billing.js";
@@ -59,6 +60,7 @@ import type * as system_usage from "../system/usage.js";
 import type * as system_voiceDemo from "../system/voiceDemo.js";
 import type * as system_voiceTrials from "../system/voiceTrials.js";
 import type * as users from "../users.js";
+import type * as vapiWebhook from "../vapiWebhook.js";
 
 import type {
   ApiFromModules,
@@ -87,6 +89,7 @@ declare const fullApi: ApiFromModules<{
   "lib/polarMapping": typeof lib_polarMapping;
   "lib/secrets": typeof lib_secrets;
   "lib/standardWebhooks": typeof lib_standardWebhooks;
+  "lib/vapiReport": typeof lib_vapiReport;
   "lib/voiceDemo": typeof lib_voiceDemo;
   playground: typeof playground;
   "private/billing": typeof private_billing;
@@ -126,6 +129,7 @@ declare const fullApi: ApiFromModules<{
   "system/voiceDemo": typeof system_voiceDemo;
   "system/voiceTrials": typeof system_voiceTrials;
   users: typeof users;
+  vapiWebhook: typeof vapiWebhook;
 }>;
 declare const fullApiWithMounts: typeof fullApi;
 
