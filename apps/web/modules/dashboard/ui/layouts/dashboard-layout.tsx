@@ -21,7 +21,11 @@ export const DashboardLayout = async ({
       <OrganizationGuard>
         <Provider>
           <SidebarProvider defaultOpen={defaultOpen}>
-            <div className="flex h-svh min-h-0 w-full flex-col overflow-hidden">
+            {/* One variable drives the top bar height and the sidebar's top offset. */}
+            <div
+              className="flex h-svh min-h-0 w-full flex-col overflow-hidden"
+              style={{ "--topbar-height": "4rem" } as React.CSSProperties}
+            >
               {/* Shared top bar */}
               <DashboardTopbar />
 
@@ -29,7 +33,8 @@ export const DashboardLayout = async ({
               <div className="flex min-h-0 flex-1">
                 <DashboardSidebar />
 
-                <main className="min-w-0 flex-1 overflow-y-auto">
+                {/* Pages use min-h-screen; subtract the bar so they do not scroll by its height. */}
+                <main className="min-w-0 flex-1 overflow-y-auto [&_.min-h-screen]:min-h-[calc(100svh-var(--topbar-height))]">
                   {children}
                 </main>
               </div>

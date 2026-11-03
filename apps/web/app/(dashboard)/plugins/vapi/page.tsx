@@ -1,12 +1,9 @@
-import { FeatureGate } from "@/modules/billing/ui/components/feature-gate";
-import { VapiView } from "@/modules/plugins/ui/views/vapi-view";
+import { VoicePageGate } from "@/modules/plugins/ui/components/voice-page-gate";
 
 const Page = () => {
-  return (
-    <FeatureGate feature="voice">
-      <VapiView />
-    </FeatureGate>
-  );
+  return <VoicePageGate />;
 };
 
 export default Page;
+
+export const metadata = { title: "Voice assistant" };
