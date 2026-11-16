@@ -24,9 +24,9 @@ import {
 import type { DataModel } from "./dataModel.js";
 
 type GenericCtx =
-  | GenericActionCtx<DataModel>
-  | GenericMutationCtx<DataModel>
-  | GenericQueryCtx<DataModel>;
+  | GenericActionCtx<DataModel, AnyComponents>
+  | GenericMutationCtx<DataModel, AnyComponents>
+  | GenericQueryCtx<DataModel, AnyComponents>;
 
 /**
  * Define a query in this Convex app's public API.
@@ -110,7 +110,7 @@ export declare const httpAction: HttpActionBuilder;
  * This differs from the {@link MutationCtx} because all of the services are
  * read-only.
  */
-export type QueryCtx = GenericQueryCtx<DataModel>;
+export type QueryCtx = GenericQueryCtx<DataModel, AnyComponents>;
 
 /**
  * A set of services for use within Convex mutation functions.
@@ -118,7 +118,7 @@ export type QueryCtx = GenericQueryCtx<DataModel>;
  * The mutation context is passed as the first argument to any Convex mutation
  * function run on the server.
  */
-export type MutationCtx = GenericMutationCtx<DataModel>;
+export type MutationCtx = GenericMutationCtx<DataModel, AnyComponents>;
 
 /**
  * A set of services for use within Convex action functions.
@@ -126,7 +126,7 @@ export type MutationCtx = GenericMutationCtx<DataModel>;
  * The action context is passed as the first argument to any Convex action
  * function run on the server.
  */
-export type ActionCtx = GenericActionCtx<DataModel>;
+export type ActionCtx = GenericActionCtx<DataModel, AnyComponents>;
 
 /**
  * An interface to read from the database within Convex query functions.
