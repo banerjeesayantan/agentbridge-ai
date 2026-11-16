@@ -3,7 +3,7 @@ import { ConvexError, v } from "convex/values";
 import { internal } from "../_generated/api";
 import { action, mutation } from "../_generated/server";
 import { isContactSessionActive } from "../lib/contactSessionPolicy";
-
+import type { Id } from "../_generated/dataModel";
 const clerkSecretKey = process.env.CLERK_SECRET_KEY;
 const clerkClient = createClerkClient({
   secretKey: clerkSecretKey || "",
@@ -72,7 +72,8 @@ export const validate = mutation({
   args: {
     contactSessionId: v.id("contactSessions"),
   },
-  handler: async (ctx, args) => {
+handler: async (ctx, args): Promise<Id<"contactSessions">> => {    
+   
     const contactSession = await ctx.db.get(args.contactSessionId);
 
     if (!contactSession || !isContactSessionActive(contactSession.expiresAt, Date.now())) {
