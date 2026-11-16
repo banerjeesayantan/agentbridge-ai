@@ -82,7 +82,7 @@ export const ConversationIdView = ({
     const currentValue = form.getValues("message");
 
     try {
-      const response = await enhanceResponse({ prompt: currentValue });
+      const response = await enhanceResponse({ prompt: currentValue, requestId: crypto.randomUUID() });
 
       form.setValue("message", response);
     } catch (error) {

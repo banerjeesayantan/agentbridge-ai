@@ -1,0 +1,176 @@
+/**
+ * Additive tables for paid voice: tenant wallets, an append-only ledger,
+ * reservations, actual usage, provider expenses, and operator controls.
+ * Spread into the existing schema:  defineSchema({ ...existing, ...financeTables })
+ *
+ * All money is an INTEGER number of micro-dollars. Tenant wallets, the central
+ * provider balance and expenses are separate tables on purpose: a tenant's
+ * wallet is a budget allowance, not cash, and the provider balance is the
+ * platform's own money.
+ */
+import { defineTable } from "convex/server";
+import { v } from "convex/values";
+
+export const financeTables = {
+  // One row per organization per usage period. Aggregates only; the ledger is the audit trail.
+  voiceWallets: defineTable({
+    organizationId: v.string(),
+    periodStart: v.number(),
+    periodEnd: v.number(),
+    budgetMicro: v.number(),
+    reservedMicro: v.number(),
+    spentMicro: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_organization_id_and_period_start", ["organizationId", "periodStart"]),
+
+  // Append-only. Rows are inserted, never patched or deleted. `idempotencyKey` is unique by convention.
+  voiceWalletTransactions: defineTable({
+    walletId: v.id("voiceWallets"),
+    organizationId: v.string(),
+    type: v.union(v.literal("grant"), v.literal("reserve"), v.literal("release"), v.literal("settle")),
+    amountMicro: v.number(),
+    idempotencyKey: v.string(),
+    reservationId: v.optional(v.id("voiceCallReservations")),
+    providerCallId: v.optional(v.string()),
+    note: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_idempotency_key", ["idempotencyKey"])
+    .index("by_wallet_id", ["walletId"]),
+
+  voiceCallReservations: defineTable({
+    organizationId: v.string(),
+    contactSessionId: v.id("contactSessions"),
+    walletId: v.id("voiceWallets"),
+    assistantId: v.string(),
+    reservedMicro: v.number(),
+    status: v.union(
+      v.literal("authorized"), // token issued; a call may exist until holdDeadline
+      v.literal("settled"), // provider report received, cost known
+      v.literal("pending_cost"), // call ended but cost unknown: hold kept until reconciled
+      v.literal("expired_no_report"), // deadline passed with no provider event
+      v.literal("released_unissued"), // token could not be issued; no call possible
+    ),
+    tokenExpiresAt: v.number(),
+    holdDeadline: v.number(),
+    maxCallSeconds: v.number(),
+    providerCallId: v.optional(v.string()),
+    createdAt: v.number(),
+    settledAt: v.optional(v.number()),
+  })
+    .index("by_organization_id_and_status", ["organizationId", "status"])
+    .index("by_status_and_hold_deadline", ["status", "holdDeadline"])
+    .index("by_contact_session_id", ["contactSessionId"]),
+
+  // Actual provider-reported usage. costMicro is absent while costStatus is "pending": never zero.
+  voiceUsage: defineTable({
+    organizationId: v.string(),
+    providerCallId: v.string(),
+    assistantId: v.string(),
+    walletId: v.optional(v.id("voiceWallets")),
+    reservationId: v.optional(v.id("voiceCallReservations")),
+    costStatus: v.union(v.literal("known"), v.literal("pending")),
+    // Actual provider cost (what the platform pays Vapi). Absent while pending: never zero.
+    costMicro: v.optional(v.number()),
+    // Allowance debited from the organization's voice wallet. Under the flat-subscription
+    // model this equals the actual provider cost; it is absent while the cost is pending.
+    customerChargeMicro: v.optional(v.number()),
+    rawCostUsd: v.optional(v.number()),
+    durationSeconds: v.optional(v.number()),
+    startedAtMs: v.optional(v.number()),
+    endedAtMs: v.optional(v.number()),
+    endedReason: v.optional(v.string()),
+    overridesDetected: v.boolean(),
+    // A call that matched no open reservation (cost is still recorded).
+    unreserved: v.boolean(),
+    createdAt: v.number(),
+  })
+    .index("by_provider_call_id", ["providerCallId"])
+    .index("by_organization_id", ["organizationId"]),
+
+  // What the platform actually paid the provider, per call. Separate from tenant wallets.
+  providerExpenses: defineTable({
+    kind: v.union(v.literal("paid_call"), v.literal("free_demo")),
+    providerCallId: v.string(),
+    organizationId: v.optional(v.string()),
+    costStatus: v.union(v.literal("known"), v.literal("pending")),
+    costMicro: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_provider_call_id", ["providerCallId"])
+    .index("by_cost_status", ["costStatus"]),
+
+  // Singleton row (key "central"): the platform's own Vapi account state.
+  providerAccount: defineTable({
+    key: v.literal("central"),
+    balanceMicro: v.optional(v.number()),
+    // "manual" until a verified provider balance source exists.
+    balanceSource: v.optional(v.union(v.literal("manual"), v.literal("verified"))),
+    lowBalanceThresholdMicro: v.optional(v.number()),
+    paused: v.boolean(),
+    updatedAt: v.number(),
+    updatedBy: v.string(),
+  }).index("by_key", ["key"]),
+
+  orgVoiceControls: defineTable({
+    organizationId: v.string(),
+    suspended: v.boolean(),
+    reason: v.optional(v.string()),
+    updatedAt: v.number(),
+    updatedBy: v.string(),
+  }).index("by_organization_id", ["organizationId"]),
+
+  adminAuditLog: defineTable({
+    actorUserId: v.string(),
+    action: v.string(),
+    targetType: v.string(),
+    targetId: v.string(),
+    detail: v.optional(v.record(v.string(), v.string())),
+    createdAt: v.number(),
+  }).index("by_created_at", ["createdAt"]),
+
+  // Provider events already applied (idempotency), keyed by e.g. "vapi:end-of-call-report:<callId>".
+  processedProviderEvents: defineTable({
+    eventKey: v.string(),
+    provider: v.string(),
+    receivedAt: v.number(),
+  }).index("by_event_key", ["eventKey"]),
+
+  // Server-controlled organization -> managed assistant mapping. Never client-supplied.
+  managedAssistants: defineTable({
+    organizationId: v.string(),
+    vapiAssistantId: v.string(),
+    createdAt: v.number(),
+    createdBy: v.string(),
+  })
+    .index("by_organization_id", ["organizationId"])
+    .index("by_vapi_assistant_id", ["vapiAssistantId"]),
+
+  // Verified Polar payment events, per organization. Amounts are positive; `kind` gives the sign.
+  //   payment      + net collected (after discounts, before tax), from order.paid
+  //   refund       - refunded net amount, from order.refunded (delta against earlier refunds)
+  //   platform_fee - Polar's reported platform fee on the order (processing fees are NOT separately reported)
+  // Unknown fees are simply absent: the accounting layer labels them "not reported", never zero.
+  revenueEntries: defineTable({
+    eventKey: v.string(),
+    polarOrderId: v.string(),
+    organizationId: v.string(),
+    kind: v.union(v.literal("payment"), v.literal("refund"), v.literal("platform_fee")),
+    amountMicro: v.number(),
+    currency: v.string(),
+    occurredAt: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_event_key", ["eventKey"])
+    .index("by_polar_order_id", ["polarOrderId"])
+    .index("by_organization_id", ["organizationId"]),
+
+  // Singleton (key "default"): revenue allocation in basis points. Absent => DEFAULT_ALLOCATION.
+  revenueAllocationSettings: defineTable({
+    key: v.literal("default"),
+    parts: v.array(v.object({ key: v.string(), bps: v.number() })),
+    updatedAt: v.number(),
+    updatedBy: v.string(),
+  }).index("by_key", ["key"]),
+};

@@ -1,6 +1,6 @@
-import { defineSchema, defineTable } from "convex/server";
+﻿import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-
+import { financeTables } from "./schema.finance";
 export default defineSchema({
   subscriptions: defineTable({
     organizationId: v.string(),
@@ -41,6 +41,12 @@ export default defineSchema({
   usageEvents: defineTable({
     organizationId: v.string(),
     requestId: v.string(),
+    metric: v.optional(v.literal("aiMessages")),
+    units: v.optional(v.number()),
+    // Absent on legacy rows, which behave as "committed".
+    status: v.optional(v.union(v.literal("committed"), v.literal("refunded"))),
+    // Billing period the units were counted in (needed to refund the right row).
+    periodStart: v.optional(v.number()),
   }).index("by_org_request", ["organizationId", "requestId"]),
   widgetSettings: defineTable({
     organizationId: v.string(),
@@ -106,4 +112,41 @@ export default defineSchema({
   users: defineTable({
     name: v.string(),
   }),
+  organizations: defineTable({
+    clerkOrgId: v.string(),
+    name: v.optional(v.string()),
+    status: v.union(v.literal("active"), v.literal("deleted")),
+    updatedAt: v.number(),
+  }).index("by_clerk_org_id", ["clerkOrgId"]),
+  rateLimits: defineTable({
+    key: v.string(),
+    tokens: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_key", ["key"])
+    .index("by_updated_at", ["updatedAt"]),
+  fileUploads: defineTable({
+    organizationId: v.string(),
+    key: v.string(),
+    createdAt: v.number(),
+  })    .index("by_organization_id", ["organizationId"])
+    .index("by_organization_id_and_created_at", ["organizationId", "createdAt"]),
+  feedback: defineTable({
+    organizationId: v.string(),
+    conversationId: v.id("conversations"),
+    threadId: v.string(),
+    messageId: v.string(),
+    rating: v.union(
+      v.literal("positive"),
+      v.literal("negative")
+    ),
+    comment: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_conversation", ["conversationId"])
+    .index("by_organization_id", ["organizationId"])
+    .index("by_organization_and_message", ["organizationId", "messageId"])
+    .index("by_organization_and_created_at", ["organizationId", "createdAt"]),
+  ...financeTables,
 });
+
