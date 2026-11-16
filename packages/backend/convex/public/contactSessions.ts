@@ -1,10 +1,13 @@
+
 import { createClerkClient } from "@clerk/backend";
 import { ConvexError, v } from "convex/values";
 import { internal } from "../_generated/api";
 import { action, mutation } from "../_generated/server";
 import { isContactSessionActive } from "../lib/contactSessionPolicy";
 import type { Id } from "../_generated/dataModel";
+
 const clerkSecretKey = process.env.CLERK_SECRET_KEY;
+
 const clerkClient = createClerkClient({
   secretKey: clerkSecretKey || "",
 });
@@ -27,11 +30,8 @@ const metadataValidator = v.optional(
 );
 
 /**
- * Public visitor entry point.
- *
- * Organization IDs are supplied by the embed snippet, so verify the ID with
- * Clerk before creating a visitor session. The database write itself remains
- * internal and cannot be called directly by an untrusted client.
+ * Verify the organization with Clerk before creating a visitor session.
+ * The database write is restricted to the internal mutation.
  */
 export const create = action({
   args: {
@@ -40,8 +40,8 @@ export const create = action({
     organizationId: v.string(),
     metadata: metadataValidator,
   },
-handler: async (ctx, args): Promise<Id<"contactSessions">> => {    
-  if (!clerkSecretKey) {
+  handler: async (ctx, args): Promise<Id<"contactSessions">> => {
+    if (!clerkSecretKey) {
       throw new ConvexError({
         code: "SERVICE_UNAVAILABLE",
         message: "Organization verification is not configured.",
@@ -59,24 +59,27 @@ handler: async (ctx, args): Promise<Id<"contactSessions">> => {
       });
     }
 
-    return await ctx.runMutation(internal.system.contactSessions.create, args);
+    return await ctx.runMutation(
+      internal.system.contactSessions.create,
+      args,
+    );
   },
 });
 
 /**
- * The contact-session ID is a bearer capability. Return only validity state;
- * never expose the visitor's name, email, or browser metadata from this
- * public endpoint.
+ * Expose validity only, never visitor information.
  */
 export const validate = mutation({
   args: {
     contactSessionId: v.id("contactSessions"),
   },
-handler: async (ctx, args): Promise<{ valid: boolean }> => {    
-   
+  handler: async (ctx, args): Promise<{ valid: boolean }> => {
     const contactSession = await ctx.db.get(args.contactSessionId);
 
-    if (!contactSession || !isContactSessionActive(contactSession.expiresAt, Date.now())) {
+    if (
+      !contactSession ||
+      !isContactSessionActive(contactSession.expiresAt, Date.now())
+    ) {
       return { valid: false };
     }
 
