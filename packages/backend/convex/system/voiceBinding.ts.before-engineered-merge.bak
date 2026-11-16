@@ -1,0 +1,118 @@
+import { v } from "convex/values";
+import { internal } from "../_generated/api";
+import { internalAction } from "../_generated/server";
+import { loadCentralVapiCredentials } from "../lib/vapiCentral";
+
+type BindResult =
+  | { ok: true; outcome: "bound" | "already_bound" }
+  | { ok: false; code: string; retryable: boolean };
+
+const fail = (code: string, retryable: boolean): BindResult => ({
+  ok: false,
+  code,
+  retryable,
+});
+
+export const bindVerifiedCall = internalAction({
+  args: {
+    providerCallId: v.string(),
+    assistantId: v.string(),
+  },
+
+  handler: async (ctx, args): Promise<BindResult> => {
+    const credentials = await loadCentralVapiCredentials();
+
+    if (!credentials) {
+      console.error("ALERT: central Vapi credentials unavailable");
+      return fail("VERIFIER_UNAVAILABLE", true);
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8_000);
+
+    try {
+      const response = await fetch(
+        `https://api.vapi.ai/call/${encodeURIComponent(args.providerCallId)}`,
+        {
+          method: "GET",
+          headers: {
+            authorization: `Bearer ${credentials.privateApiKey}`,
+            accept: "application/json",
+          },
+          signal: controller.signal,
+        },
+      );
+
+      if (response.status === 404) {
+        return fail("CALL_NOT_FOUND", false);
+      }
+
+      if (!response.ok) {
+        return fail("VERIFIER_ERROR", true);
+      }
+
+      let call: Record<string, unknown>;
+
+      try {
+        call = (await response.json()) as Record<string, unknown>;
+      } catch {
+        return fail("VERIFIER_BAD_RESPONSE", true);
+      }
+
+      if (call.id !== args.providerCallId) {
+        return fail("CALL_ID_MISMATCH", false);
+      }
+
+      if (call.assistantId !== args.assistantId) {
+        return fail("ASSISTANT_MISMATCH", false);
+      }
+
+      if (call.type !== "webCall") {
+        return fail("UNSUPPORTED_CALL_TYPE", false);
+      }
+
+      const callCreatedAtMs =
+        typeof call.createdAt === "string"
+          ? Date.parse(call.createdAt)
+          : NaN;
+
+      if (!Number.isFinite(callCreatedAtMs)) {
+        return fail("CALL_TIME_UNKNOWN", false);
+      }
+
+      const candidate = await ctx.runQuery(
+        internal.system.voiceWallet.findBindableReservation,
+        {
+          assistantId: args.assistantId,
+          callCreatedAtMs,
+        },
+      );
+
+      if (!candidate.ok) {
+        return fail(
+          candidate.code,
+          candidate.code === "NO_CANDIDATE",
+        );
+      }
+
+      const bound = await ctx.runMutation(
+        internal.system.voiceWallet.bindCall,
+        {
+          reservationId: candidate.reservationId,
+          providerCallId: args.providerCallId,
+          assistantId: args.assistantId,
+        },
+      );
+
+      if (!bound.ok) {
+        return fail(bound.code, false);
+      }
+
+      return { ok: true, outcome: bound.outcome };
+    } catch {
+      return fail("VERIFIER_UNREACHABLE", true);
+    } finally {
+      clearTimeout(timeout);
+    }
+  },
+});

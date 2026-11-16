@@ -17,8 +17,9 @@
     "lib": ["ES2021", "dom"],
     "forceConsistentCasingInFileNames": true,
     "module": "ESNext",
-    "isolatedModules": true,
-    "noEmit": true
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "isolatedModules": true
   },
   "include": ["./**/*"],
   "exclude": ["./_generated"]

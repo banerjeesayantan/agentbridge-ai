@@ -1,0 +1,944 @@
+import { v } from "convex/values";
+import type { Doc, Id } from "../_generated/dataModel";
+import {
+  internalMutation,
+  internalQuery,
+  type MutationCtx,
+} from "../_generated/server";
+import { getEntitlements } from "../lib/entitlements";
+import { isMicro } from "../lib/money";
+import { holdDeadline, readVoiceBudgetConfig } from "../lib/voiceBudget";
+
+export type DenyCode =
+  | "VOICE_UNAVAILABLE"
+  | "SESSION_INVALID"
+  | "PROVIDER_PAUSED"
+  | "ORG_SUSPENDED"
+  | "PLAN_REQUIRED"
+  | "NO_ASSISTANT"
+  | "IN_PROGRESS"
+  | "SESSION_LIMIT"
+  | "NO_BUDGET";
+
+type TxType = "grant" | "reserve" | "release" | "settle";
+
+type ReservationStatus = "settled" | "expired_no_report" | "released_unissued";
+
+/**
+ * Append one ledger transaction and update its wallet aggregate.
+ * Repeated idempotency keys never apply a second balance change.
+ */
+async function applyTx(
+  ctx: MutationCtx,
+  tx: {
+    walletId: Id<"voiceWallets">;
+    organizationId: string;
+    type: TxType;
+    amountMicro: number;
+    key: string;
+    reservationId?: Id<"voiceCallReservations">;
+    providerCallId?: string;
+    note?: string;
+  },
+): Promise<boolean> {
+  if (!isMicro(tx.amountMicro)) {
+    throw new RangeError(
+      "Ledger amounts must be non-negative integer micro-dollars",
+    );
+  }
+
+  const existing = await ctx.db
+    .query("voiceWalletTransactions")
+    .withIndex("by_idempotency_key", (q) => q.eq("idempotencyKey", tx.key))
+    .first();
+
+  if (existing) return false;
+
+  const wallet = await ctx.db.get(tx.walletId);
+  if (!wallet) throw new Error("Wallet not found");
+
+  let budgetMicro = wallet.budgetMicro;
+  let reservedMicro = wallet.reservedMicro;
+  let spentMicro = wallet.spentMicro;
+
+  switch (tx.type) {
+    case "grant":
+      budgetMicro += tx.amountMicro;
+      break;
+
+    case "reserve":
+      reservedMicro += tx.amountMicro;
+      break;
+
+    case "release": {
+      const releasedMicro = Math.min(tx.amountMicro, reservedMicro);
+
+      if (releasedMicro !== tx.amountMicro) {
+        console.error("ALERT: wallet release exceeded reserved balance", {
+          walletId: tx.walletId,
+          requestedMicro: tx.amountMicro,
+          availableReservedMicro: reservedMicro,
+        });
+      }
+
+      reservedMicro -= releasedMicro;
+      break;
+    }
+
+    case "settle":
+      spentMicro += tx.amountMicro;
+      break;
+  }
+
+  const now = Date.now();
+
+  await ctx.db.patch(tx.walletId, {
+    budgetMicro,
+    reservedMicro,
+    spentMicro,
+    updatedAt: now,
+  });
+
+  await ctx.db.insert("voiceWalletTransactions", {
+    walletId: tx.walletId,
+    organizationId: tx.organizationId,
+    type: tx.type,
+    amountMicro: tx.amountMicro,
+    idempotencyKey: tx.key,
+    reservationId: tx.reservationId,
+    providerCallId: tx.providerCallId,
+    note: tx.note,
+    createdAt: now,
+  });
+
+  return true;
+}
+
+/**
+ * Release a reservation hold and close its lifecycle.
+ */
+async function closeHold(
+  ctx: MutationCtx,
+  reservation: Doc<"voiceCallReservations">,
+  status: ReservationStatus,
+  suffix: string,
+  extra: {
+    providerCallId?: string;
+    note?: string;
+  } = {},
+) {
+  await applyTx(ctx, {
+    walletId: reservation.walletId,
+    organizationId: reservation.organizationId,
+    type: "release",
+    amountMicro: reservation.reservedMicro,
+    key: `release:${reservation._id}:${suffix}`,
+    reservationId: reservation._id,
+    providerCallId: extra.providerCallId,
+    note: extra.note,
+  });
+
+  await ctx.db.patch(reservation._id, {
+    status,
+    settledAt: Date.now(),
+    ...(extra.providerCallId ? { providerCallId: extra.providerCallId } : {}),
+  });
+}
+
+/**
+ * Get or create the organization's wallet for the current billing period.
+ *
+ * Upgrades top up the budget by the difference.
+ * Downgrades do not claw back already granted budget.
+ */
+async function ensureWallet(
+  ctx: MutationCtx,
+  organizationId: string,
+  periodStart: number,
+  periodEnd: number,
+  planBudgetMicro: number,
+  now: number,
+): Promise<Doc<"voiceWallets">> {
+  let wallet = await ctx.db
+    .query("voiceWallets")
+    .withIndex("by_organization_id_and_period_start", (q) =>
+      q.eq("organizationId", organizationId).eq("periodStart", periodStart),
+    )
+    .unique();
+
+  if (!wallet) {
+    const walletId = await ctx.db.insert("voiceWallets", {
+      organizationId,
+      periodStart,
+      periodEnd,
+      budgetMicro: 0,
+      reservedMicro: 0,
+      spentMicro: 0,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    await applyTx(ctx, {
+      walletId,
+      organizationId,
+      type: "grant",
+      amountMicro: planBudgetMicro,
+      key: `grant:${organizationId}:${periodStart}:${planBudgetMicro}`,
+    });
+
+    const createdWallet = await ctx.db.get(walletId);
+    if (!createdWallet) throw new Error("Wallet creation failed");
+
+    return createdWallet;
+  }
+
+  if (planBudgetMicro > wallet.budgetMicro) {
+    await applyTx(ctx, {
+      walletId: wallet._id,
+      organizationId,
+      type: "grant",
+      amountMicro: planBudgetMicro - wallet.budgetMicro,
+      key: `grant:${organizationId}:${periodStart}:${planBudgetMicro}`,
+      note: "plan budget increase",
+    });
+
+    const updatedWallet = await ctx.db.get(wallet._id);
+    if (!updatedWallet) throw new Error("Wallet not found after grant");
+
+    wallet = updatedWallet;
+  }
+
+  return wallet;
+}
+
+/**
+ * Release authorized holds whose deadline has passed.
+ */
+async function expireOrgHolds(
+  ctx: MutationCtx,
+  organizationId: string,
+  now: number,
+) {
+  const openReservations = await ctx.db
+    .query("voiceCallReservations")
+    .withIndex("by_organization_id_and_status", (q) =>
+      q.eq("organizationId", organizationId).eq("status", "authorized"),
+    )
+    .take(50);
+
+  for (const reservation of openReservations) {
+    if (reservation.holdDeadline <= now) {
+      await closeHold(ctx, reservation, "expired_no_report", "expired", {
+        note: "no provider event by hold deadline",
+      });
+    }
+  }
+}
+
+/**
+ * Authorize one paid voice call.
+ *
+ * The browser supplies only its contact session ID.
+ * Organization, plan, assistant and budget are resolved server-side.
+ */
+export const reserveCall = internalMutation({
+  args: {
+    contactSessionId: v.id("contactSessions"),
+  },
+
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const deny = (code: DenyCode) => ({
+      ok: false as const,
+      code,
+    });
+
+    const config = readVoiceBudgetConfig(process.env);
+
+    if (!config.ready) {
+      return deny("VOICE_UNAVAILABLE");
+    }
+
+    const session = await ctx.db.get(args.contactSessionId);
+
+    if (!session || session.expiresAt <= now) {
+      return deny("SESSION_INVALID");
+    }
+
+    const organizationId = session.organizationId;
+
+    const providerAccount = await ctx.db
+      .query("providerAccount")
+      .withIndex("by_key", (q) => q.eq("key", "central"))
+      .first();
+
+    if (providerAccount?.paused) {
+      return deny("PROVIDER_PAUSED");
+    }
+
+    const organizationControl = await ctx.db
+      .query("orgVoiceControls")
+      .withIndex("by_organization_id", (q) =>
+        q.eq("organizationId", organizationId),
+      )
+      .first();
+
+    if (organizationControl?.suspended) {
+      return deny("ORG_SUSPENDED");
+    }
+
+    const entitlements = await getEntitlements(ctx, organizationId, now);
+
+    if (
+      (entitlements.plan !== "pro" && entitlements.plan !== "enterprise") ||
+      !entitlements.limits.voice
+    ) {
+      return deny("PLAN_REQUIRED");
+    }
+
+    // Entitlements use "enterprise"; the budget configuration uses "business".
+    const budgetPlan = entitlements.plan === "enterprise" ? "business" : "pro";
+
+    const planBudgetMicro = config.planBudgetMicro[budgetPlan];
+
+    if (!isMicro(planBudgetMicro) || planBudgetMicro === 0) {
+      return deny("VOICE_UNAVAILABLE");
+    }
+
+    const assistant = await ctx.db
+      .query("managedAssistants")
+      .withIndex("by_organization_id", (q) =>
+        q.eq("organizationId", organizationId),
+      )
+      .first();
+
+    if (!assistant) {
+      return deny("NO_ASSISTANT");
+    }
+
+    // Returned denials commit this housekeeping.
+    await expireOrgHolds(ctx, organizationId, now);
+
+    const wallet = await ensureWallet(
+      ctx,
+      organizationId,
+      entitlements.periodStart,
+      entitlements.periodEnd,
+      planBudgetMicro,
+      now,
+    );
+
+    const openReservations = await ctx.db
+      .query("voiceCallReservations")
+      .withIndex("by_organization_id_and_status", (q) =>
+        q.eq("organizationId", organizationId).eq("status", "authorized"),
+      )
+      .take(50);
+
+    // Reuse the same visitor's active reservation without extending expiry.
+    const existingReservation = openReservations.find(
+      (reservation) =>
+        reservation.contactSessionId === args.contactSessionId &&
+        reservation.tokenExpiresAt > now,
+    );
+
+    if (existingReservation) {
+      // One reservation authorizes exactly one provider call. Once it is bound
+      // to a call, it must never be handed out again.
+      if (existingReservation.providerCallId !== undefined) {
+        return deny("IN_PROGRESS");
+      }
+
+      return {
+        ok: true as const,
+        reused: true,
+        reservationId: existingReservation._id,
+        assistantId: existingReservation.assistantId,
+        tokenExpiresAt: existingReservation.tokenExpiresAt,
+        maxCallSeconds: existingReservation.maxCallSeconds,
+        reservedMicro: existingReservation.reservedMicro,
+      };
+    }
+
+    if (openReservations.length >= config.maxConcurrentPerOrg) {
+      return deny("IN_PROGRESS");
+    }
+
+    const previousAuthorizations = await ctx.db
+      .query("voiceCallReservations")
+      .withIndex("by_contact_session_id", (q) =>
+        q.eq("contactSessionId", args.contactSessionId),
+      )
+      .take(config.maxAuthorizationsPerSession);
+
+    if (previousAuthorizations.length >= config.maxAuthorizationsPerSession) {
+      return deny("SESSION_LIMIT");
+    }
+
+    const availableMicro =
+      wallet.budgetMicro - wallet.spentMicro - wallet.reservedMicro;
+
+    if (availableMicro < config.reservationMicro) {
+      return deny("NO_BUDGET");
+    }
+
+    const tokenExpiresAt =
+      (Math.floor(now / 1000) + config.tokenTtlSeconds) * 1000;
+
+    const reservationId = await ctx.db.insert("voiceCallReservations", {
+      organizationId,
+      contactSessionId: args.contactSessionId,
+      walletId: wallet._id,
+      assistantId: assistant.vapiAssistantId,
+      reservedMicro: config.reservationMicro,
+      status: "authorized",
+      tokenExpiresAt,
+      holdDeadline: holdDeadline(tokenExpiresAt, config),
+      maxCallSeconds: config.maxCallSeconds,
+      createdAt: now,
+    });
+
+    await applyTx(ctx, {
+      walletId: wallet._id,
+      organizationId,
+      type: "reserve",
+      amountMicro: config.reservationMicro,
+      key: `reserve:${reservationId}`,
+      reservationId,
+    });
+
+    return {
+      ok: true as const,
+      reused: false,
+      reservationId,
+      assistantId: assistant.vapiAssistantId,
+      tokenExpiresAt,
+      maxCallSeconds: config.maxCallSeconds,
+      reservedMicro: config.reservationMicro,
+    };
+  },
+});
+
+/**
+ * Release a reservation when token issuance failed.
+ * This must only be called when the token was never returned to the browser.
+ */
+export const releaseUnissued = internalMutation({
+  args: {
+    reservationId: v.id("voiceCallReservations"),
+  },
+
+  handler: async (ctx, args) => {
+    const reservation = await ctx.db.get(args.reservationId);
+
+    if (!reservation || reservation.status !== "authorized") {
+      return { released: false as const };
+    }
+
+    await closeHold(ctx, reservation, "released_unissued", "unissued", {
+      note: "token not issued",
+    });
+
+    return { released: true as const };
+  },
+});
+
+/**
+ * Bind one authorized reservation to exactly one provider call.
+ *
+ * This mutation does NOT verify that the provider call exists. It must only be
+ * invoked by `voiceBinding.bindVerifiedCall`, which confirms the call with the
+ * provider and resolves the reservation server-side. Never call it with a
+ * browser-supplied ID. Binding is one-to-one and idempotent: the same pair
+ * binds once, and neither side can be bound to anything else afterwards.
+ */
+export const bindCall = internalMutation({
+  args: {
+    reservationId: v.id("voiceCallReservations"),
+    providerCallId: v.string(),
+    assistantId: v.string(),
+  },
+
+  handler: async (ctx, args) => {
+    const now = Date.now();
+
+    const reservation = await ctx.db.get(args.reservationId);
+
+    if (!reservation) {
+      return { ok: false as const, code: "UNKNOWN_RESERVATION" as const };
+    }
+
+    if (reservation.assistantId !== args.assistantId) {
+      return { ok: false as const, code: "ASSISTANT_MISMATCH" as const };
+    }
+
+    if (reservation.providerCallId === args.providerCallId) {
+      return { ok: true as const, outcome: "already_bound" as const };
+    }
+
+    if (reservation.providerCallId !== undefined) {
+      return { ok: false as const, code: "RESERVATION_ALREADY_BOUND" as const };
+    }
+
+    if (reservation.status !== "authorized" || reservation.holdDeadline <= now) {
+      return { ok: false as const, code: "RESERVATION_NOT_OPEN" as const };
+    }
+
+    const recordedUsage = await ctx.db
+      .query("voiceUsage")
+      .withIndex("by_provider_call_id", (q) =>
+        q.eq("providerCallId", args.providerCallId),
+      )
+      .first();
+
+    if (recordedUsage) {
+      return { ok: false as const, code: "CALL_ALREADY_RECORDED" as const };
+    }
+
+    // The same provider call can never be bound to two reservations.
+    const siblings = await ctx.db
+      .query("voiceCallReservations")
+      .withIndex("by_organization_id_and_status", (q) =>
+        q
+          .eq("organizationId", reservation.organizationId)
+          .eq("status", "authorized"),
+      )
+      .take(50);
+
+    if (
+      siblings.some(
+        (item) =>
+          item._id !== reservation._id &&
+          item.providerCallId === args.providerCallId,
+      )
+    ) {
+      return { ok: false as const, code: "CALL_BOUND_ELSEWHERE" as const };
+    }
+
+    await ctx.db.patch(reservation._id, {
+      providerCallId: args.providerCallId,
+    });
+
+    return { ok: true as const, outcome: "bound" as const };
+  },
+});
+
+/**
+ * Resolve the single open, unbound reservation a verified provider call can
+ * belong to. Fails closed: zero or several candidates return a code and bind
+ * nothing. Called only by `voiceBinding.bindVerifiedCall`.
+ *
+ * `callCreatedAtMs` must come from the provider's own record of the call.
+ */
+export const findBindableReservation = internalQuery({
+  args: {
+    assistantId: v.string(),
+    callCreatedAtMs: v.number(),
+  },
+
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    const CLOCK_SKEW_MS = 60_000;
+
+    const assistantMapping = await ctx.db
+      .query("managedAssistants")
+      .withIndex("by_vapi_assistant_id", (q) =>
+        q.eq("vapiAssistantId", args.assistantId),
+      )
+      .first();
+
+    if (!assistantMapping) {
+      return { ok: false as const, code: "UNKNOWN_ASSISTANT" as const };
+    }
+
+    const open = await ctx.db
+      .query("voiceCallReservations")
+      .withIndex("by_organization_id_and_status", (q) =>
+        q
+          .eq("organizationId", assistantMapping.organizationId)
+          .eq("status", "authorized"),
+      )
+      .take(50);
+
+    const candidates = open.filter(
+  (item) =>
+    item.assistantId === args.assistantId &&
+    item.providerCallId === undefined &&
+    item.holdDeadline > now &&
+    args.callCreatedAtMs >= item.createdAt - CLOCK_SKEW_MS &&
+    args.callCreatedAtMs <= item.tokenExpiresAt + CLOCK_SKEW_MS,
+);
+
+    if (candidates.length === 0) {
+      return { ok: false as const, code: "NO_CANDIDATE" as const };
+    }
+
+    if (candidates.length > 1) {
+      return { ok: false as const, code: "AMBIGUOUS_CANDIDATES" as const };
+    }
+
+    return { ok: true as const, reservationId: candidates[0]!._id };
+  },
+});
+
+/**
+ * Apply a verified Vapi end-of-call report for a paid call.
+ *
+ * Organization attribution comes from the server-managed assistant mapping.
+ * Provider expenses and customer wallet accounting remain separate.
+ *
+ * INTERMEDIATE SAFETY PATCH: a report is settled only when exactly one
+ * authorized reservation is already bound to this provider call ID. Unmatched
+ * events are NOT marked processed, so they can be retried after binding.
+ * Binding is done by `voiceBinding.bindVerifiedCall` (provider-verified, then
+ * `bindCall`). Until the webhook invokes it, this returns
+ * RESERVATION_NOT_BOUND for every paid call.
+ */
+export const settlePaidCall = internalMutation({
+  args: {
+    eventKey: v.string(),
+    providerCallId: v.string(),
+    assistantId: v.string(),
+    costMicro: v.optional(v.number()),
+    rawCostUsd: v.optional(v.number()),
+    durationSeconds: v.optional(v.number()),
+    startedAtMs: v.optional(v.number()),
+    endedAtMs: v.optional(v.number()),
+    endedReason: v.optional(v.string()),
+    overridesDetected: v.boolean(),
+  },
+
+  handler: async (ctx, args) => {
+    const now = Date.now();
+
+    if (args.costMicro !== undefined && !isMicro(args.costMicro)) {
+      return { ok: false as const, code: "INVALID" as const };
+    }
+
+    const processedEvent = await ctx.db
+      .query("processedProviderEvents")
+      .withIndex("by_event_key", (q) => q.eq("eventKey", args.eventKey))
+      .first();
+
+    if (processedEvent) {
+      return { ok: true as const, outcome: "duplicate" as const };
+    }
+
+    const existingUsage = await ctx.db
+      .query("voiceUsage")
+      .withIndex("by_provider_call_id", (q) =>
+        q.eq("providerCallId", args.providerCallId),
+      )
+      .first();
+
+    if (existingUsage) {
+      await ctx.db.insert("processedProviderEvents", {
+        eventKey: args.eventKey,
+        provider: "vapi",
+        receivedAt: now,
+      });
+
+      return { ok: true as const, outcome: "duplicate" as const };
+    }
+
+    const assistantMapping = await ctx.db
+      .query("managedAssistants")
+      .withIndex("by_vapi_assistant_id", (q) =>
+        q.eq("vapiAssistantId", args.assistantId),
+      )
+      .first();
+
+    if (!assistantMapping) {
+      return { ok: false as const, code: "UNKNOWN_ASSISTANT" as const };
+    }
+
+    const organizationId = assistantMapping.organizationId;
+
+    // Never guess which reservation belongs to this provider call.
+    const reservations = await ctx.db
+      .query("voiceCallReservations")
+      .withIndex("by_organization_id_and_status", (q) =>
+        q.eq("organizationId", organizationId).eq("status", "authorized"),
+      )
+      .take(50);
+
+    const matchingReservations = reservations.filter(
+      (item) =>
+        item.assistantId === args.assistantId &&
+        item.providerCallId === args.providerCallId,
+    );
+
+    if (matchingReservations.length !== 1) {
+      console.error("ALERT: exact voice reservation match unavailable", {
+        organizationId,
+        assistantId: args.assistantId,
+        providerCallId: args.providerCallId,
+        matchingCount: matchingReservations.length,
+      });
+
+      // Do not process the event. A later trusted binding/retry may resolve it.
+      return {
+        ok: false as const,
+        code:
+          matchingReservations.length === 0
+            ? ("RESERVATION_NOT_BOUND" as const)
+            : ("RESERVATION_AMBIGUOUS" as const),
+      };
+    }
+
+    const reservation = matchingReservations[0]!;
+
+    const wallet = await ctx.db.get(reservation.walletId);
+
+    if (!wallet) {
+      return { ok: false as const, code: "WALLET_NOT_FOUND" as const };
+    }
+
+    if (args.overridesDetected) {
+      console.error("ALERT: call carried browser assistant overrides", {
+        organizationId,
+        providerCallId: args.providerCallId,
+      });
+    }
+
+    const costKnown = args.costMicro !== undefined;
+
+    await ctx.db.insert("voiceUsage", {
+      organizationId,
+      providerCallId: args.providerCallId,
+      assistantId: args.assistantId,
+      walletId: wallet._id,
+      reservationId: reservation._id,
+      costStatus: costKnown ? "known" : "pending",
+      costMicro: args.costMicro,
+      customerChargeMicro: args.costMicro,
+      rawCostUsd: args.rawCostUsd,
+      durationSeconds: args.durationSeconds,
+      startedAtMs: args.startedAtMs,
+      endedAtMs: args.endedAtMs,
+      endedReason: args.endedReason,
+      overridesDetected: args.overridesDetected,
+      unreserved: false,
+      createdAt: now,
+    });
+
+    await ctx.db.insert("providerExpenses", {
+      kind: "paid_call",
+      providerCallId: args.providerCallId,
+      organizationId,
+      costStatus: costKnown ? "known" : "pending",
+      costMicro: args.costMicro,
+      createdAt: now,
+    });
+
+    if (costKnown) {
+      await closeHold(ctx, reservation, "settled", "settled", {
+        providerCallId: args.providerCallId,
+      });
+
+      await applyTx(ctx, {
+        walletId: wallet._id,
+        organizationId,
+        type: "settle",
+        amountMicro: args.costMicro!,
+        key: `settle:${args.providerCallId}`,
+        reservationId: reservation._id,
+        providerCallId: args.providerCallId,
+      });
+    } else {
+      await ctx.db.patch(reservation._id, {
+        status: "pending_cost",
+      });
+    }
+
+    await ctx.db.insert("processedProviderEvents", {
+      eventKey: args.eventKey,
+      provider: "vapi",
+      receivedAt: now,
+    });
+
+    return {
+      ok: true as const,
+      outcome: costKnown ? ("settled" as const) : ("pending_cost" as const),
+    };
+  },
+});
+
+/**
+ * Reconciliation core.
+ *
+ * This is a plain function so another mutation can call it inside its
+ * own transaction without creating a nested mutation.
+ */
+export async function applyActualCost(
+  ctx: MutationCtx,
+  args: {
+    providerCallId: string;
+    costMicro: number;
+    rawCostUsd?: number;
+  },
+) {
+  if (!isMicro(args.costMicro)) {
+    return { ok: false as const, code: "INVALID" as const };
+  }
+
+  const usage = await ctx.db
+    .query("voiceUsage")
+    .withIndex("by_provider_call_id", (q) =>
+      q.eq("providerCallId", args.providerCallId),
+    )
+    .first();
+
+  if (!usage) {
+    return {
+      ok: false as const,
+      code: "UNKNOWN_CALL" as const,
+    };
+  }
+
+  if (usage.costStatus === "known") {
+    return {
+      ok: true as const,
+      outcome: "duplicate" as const,
+    };
+  }
+
+  await ctx.db.patch(usage._id, {
+    costStatus: "known",
+    costMicro: args.costMicro,
+    customerChargeMicro: args.costMicro,
+    rawCostUsd: args.rawCostUsd,
+  });
+
+  const providerExpense = await ctx.db
+    .query("providerExpenses")
+    .withIndex("by_provider_call_id", (q) =>
+      q.eq("providerCallId", args.providerCallId),
+    )
+    .first();
+
+  if (providerExpense) {
+    await ctx.db.patch(providerExpense._id, {
+      costStatus: "known",
+      costMicro: args.costMicro,
+    });
+  }
+
+  if (usage.reservationId) {
+    const reservation = await ctx.db.get(usage.reservationId);
+
+    if (reservation && reservation.status === "pending_cost") {
+      await closeHold(ctx, reservation, "settled", "settled", {
+        providerCallId: args.providerCallId,
+      });
+    }
+  }
+
+  if (usage.walletId) {
+    await applyTx(ctx, {
+      walletId: usage.walletId,
+      organizationId: usage.organizationId,
+      type: "settle",
+      amountMicro: args.costMicro,
+      key: `settle:${args.providerCallId}`,
+      reservationId: usage.reservationId,
+      providerCallId: args.providerCallId,
+      note: "reconciled provider cost",
+    });
+  }
+
+  return {
+    ok: true as const,
+    outcome: "settled" as const,
+  };
+}
+
+export const recordActualCost = internalMutation({
+  args: {
+    providerCallId: v.string(),
+    costMicro: v.number(),
+    rawCostUsd: v.optional(v.number()),
+  },
+
+  handler: (ctx, args) => applyActualCost(ctx, args),
+});
+
+/**
+ * Cron: expire authorized reservations whose hold deadline has passed.
+ */
+export const expireHolds = internalMutation({
+  args: {},
+
+  handler: async (ctx) => {
+    const now = Date.now();
+
+    const dueReservations = await ctx.db
+      .query("voiceCallReservations")
+      .withIndex("by_status_and_hold_deadline", (q) =>
+        q.eq("status", "authorized").lte("holdDeadline", now),
+      )
+      .take(100);
+
+    for (const reservation of dueReservations) {
+      await closeHold(ctx, reservation, "expired_no_report", "expired", {
+        note: "no provider event by hold deadline",
+      });
+    }
+
+    return {
+      expired: dueReservations.length,
+    };
+  },
+});
+
+/**
+ * Record the platform's actual expense for a free promotional demo.
+ *
+ * Free-demo usage does not debit a paid customer wallet.
+ * organizationId is optional because the current schema does not define
+ * a voiceSessions table from which it can safely be inferred.
+ */
+export const recordFreeDemoExpense = internalMutation({
+  args: {
+    providerCallId: v.string(),
+    costMicro: v.optional(v.number()),
+    organizationId: v.optional(v.string()),
+  },
+
+  handler: async (ctx, args) => {
+    if (args.costMicro !== undefined && !isMicro(args.costMicro)) {
+      return { recorded: false as const };
+    }
+
+    const existing = await ctx.db
+      .query("providerExpenses")
+      .withIndex("by_provider_call_id", (q) =>
+        q.eq("providerCallId", args.providerCallId),
+      )
+      .first();
+
+    if (existing) {
+      if (existing.costStatus === "pending" && args.costMicro !== undefined) {
+        await ctx.db.patch(existing._id, {
+          costStatus: "known",
+          costMicro: args.costMicro,
+        });
+
+        return { recorded: true as const, reconciled: true as const };
+      }
+
+      return { recorded: false as const };
+    }
+
+    await ctx.db.insert("providerExpenses", {
+      kind: "free_demo",
+      providerCallId: args.providerCallId,
+      organizationId: args.organizationId,
+      costStatus: args.costMicro !== undefined ? "known" : "pending",
+      costMicro: args.costMicro,
+      createdAt: Date.now(),
+    });
+
+    return { recorded: true as const, reconciled: false as const };
+  },
+});
