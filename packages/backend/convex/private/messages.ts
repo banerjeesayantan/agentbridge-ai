@@ -12,6 +12,7 @@ import { limitError } from "../lib/entitlements";
 export const enhanceResponse = action({
   args: {
     prompt: v.string(),
+    requestId: v.string(),
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
@@ -42,6 +43,7 @@ export const enhanceResponse = action({
     const usage = await ctx.runMutation(internal.system.usage.consume, {
       organizationId: orgId,
       metric: "aiMessages",
+      requestId: args.requestId,
     });
 
     if (!usage.allowed) {
@@ -50,19 +52,33 @@ export const enhanceResponse = action({
       );
     }
 
-    const response = await generateText({
-      model: chatModel(),
-      messages: [
-        {
-          role: "system",
-          content: OPERATOR_MESSAGE_ENHANCEMENT_PROMPT,
-        },
-        {
-          role: "user",
-          content: args.prompt,
-        },
-      ],
-    });
+    let response;
+    try {
+      response = await generateText({
+        model: chatModel(),
+        messages: [
+          {
+            role: "system",
+            content: OPERATOR_MESSAGE_ENHANCEMENT_PROMPT,
+          },
+          {
+            role: "user",
+            content: args.prompt,
+          },
+        ],
+      });
+    } catch (error) {
+      try {
+        await ctx.runMutation(internal.system.usage.refund, {
+          organizationId: orgId,
+          requestId: args.requestId,
+        });
+      } catch (refundError) {
+        console.error("Failed to refund AI message usage:", refundError);
+      }
+
+      throw error;
+    }
 
     return response.text;
   },

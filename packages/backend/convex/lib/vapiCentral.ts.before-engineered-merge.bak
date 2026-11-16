@@ -1,0 +1,41 @@
+/**
+ * Central AgentBridge Vapi credentials, loaded server-side from AWS Secrets
+ * Manager through the existing secrets helper. Expected secret JSON:
+ *   { "privateApiKey": "...", "orgId": "<vapi organization id>" }
+ * The secret name defaults to "platform/vapi" (override: VAPI_CENTRAL_SECRET_NAME).
+ * The private key is never logged, returned to a client, or stored in Convex.
+ */
+import { getSecretValue, parseSecretString } from "./secrets";
+
+export interface CentralVapiCredentials {
+  privateApiKey: string;
+  orgId: string;
+}
+
+const CACHE_MS = 5 * 60 * 1000;
+let cache: { value: CentralVapiCredentials; at: number } | null = null;
+
+export function clearCentralVapiCache() {
+  cache = null;
+}
+
+export async function loadCentralVapiCredentials(now: number = Date.now()): Promise<CentralVapiCredentials | null> {
+  if (cache && now - cache.at < CACHE_MS) return cache.value;
+  const name = process.env.VAPI_CENTRAL_SECRET_NAME?.trim() || "platform/vapi";
+  try {
+    const parsed = parseSecretString<{ privateApiKey?: unknown; orgId?: unknown }>(await getSecretValue(name));
+    if (
+      !parsed ||
+      typeof parsed.privateApiKey !== "string" ||
+      parsed.privateApiKey.length === 0 ||
+      typeof parsed.orgId !== "string" ||
+      parsed.orgId.length === 0
+    ) {
+      return null;
+    }
+    cache = { value: { privateApiKey: parsed.privateApiKey, orgId: parsed.orgId }, at: now };
+    return cache.value;
+  } catch {
+    return null; // never include the error: it could carry request details
+  }
+}

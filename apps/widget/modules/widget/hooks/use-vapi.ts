@@ -1,136 +1,150 @@
-
 import Vapi from "@vapi-ai/web";
 import { useAction } from "convex/react";
 import { useAtomValue } from "jotai";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@workspace/backend/_generated/api";
-import {
-  contactSessionIdAtomFamily,
-  organizationIdAtom,
-  vapiSecretsAtom,
-  widgetSettingsAtom,
-} from "../atoms/widget-atoms";
+import type { Id } from "@workspace/backend/_generated/dataModel";
+import { contactSessionIdAtomFamily, organizationIdAtom } from "../atoms/widget-atoms";
+import { errorCode, visitorMessage } from "../lib/errors";
 
 interface TranscriptMessage {
   role: "user" | "assistant";
   text: string;
 }
 
+interface Grant {
+  token: string;
+  assistantId: string;
+  /** Present for paid calls: the call is bound to this reservation after start. */
+  reservationId?: Id<"voiceCallReservations">;
+}
+
+const BIND_RETRY_DELAYS_MS = [500, 1500, 3000, 5000];
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Voice call lifecycle, fully server-authorised:
+ *  1. ask the server for permission (wallet/plan/budget reserved server-side,
+ *     receiving a short-lived scoped token;
+ *  2. start the Vapi call with that token (no tenant keys exist in the browser);
+ *  3. report the provider call ID. The server verifies it with Vapi before it
+ *     binds the call to the reservation. If binding cannot be verified the
+ *     call is ended, so no usage can escape the budget controls.
+ */
 export const useVapi = () => {
-  const vapiSecrets = useAtomValue(vapiSecretsAtom);
-  const widgetSettings = useAtomValue(widgetSettingsAtom);
   const organizationId = useAtomValue(organizationIdAtom);
-  const contactSessionId = useAtomValue(
-    contactSessionIdAtomFamily(organizationId ?? "")
-  );
+  const contactSessionId = useAtomValue(contactSessionIdAtomFamily(organizationId ?? ""));
 
-  const authorizeVoice = useAction(api.public.voiceTrials.authorize);
+  const authorizePaid = useAction(api.public.voicePaid.authorizeCall);
+  const reportCallStarted = useAction(api.public.voicePaid.reportCallStarted);
 
-  const [vapi, setVapi] = useState<Vapi | null>(null);
+  const vapiRef = useRef<Vapi | null>(null);
+  // Synchronous guard: state updates are async, so a double click could otherwise authorize twice.
+  const startingRef = useRef(false);
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [showPaywall, setShowPaywall] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<TranscriptMessage[]>([]);
 
-  useEffect(() => {
-    if (!vapiSecrets) return;
+  const teardown = useCallback(() => {
+    const instance = vapiRef.current;
+    vapiRef.current = null;
+    if (instance) {
+      instance.removeAllListeners();
+      instance.stop();
+    }
+  }, []);
 
-    const vapiInstance = new Vapi(vapiSecrets.publicApiKey);
-    setVapi(vapiInstance);
+  useEffect(() => teardown, [teardown]);
 
-    vapiInstance.on("call-start", () => {
-      setIsConnected(true);
-      setIsConnecting(false);
-      setTranscript([]);
-    });
-
-    vapiInstance.on("call-end", () => {
-      setIsConnected(false);
-      setIsConnecting(false);
-      setIsSpeaking(false);
-    });
-
-    vapiInstance.on("speech-start", () => setIsSpeaking(true));
-    vapiInstance.on("speech-end", () => setIsSpeaking(false));
-
-    vapiInstance.on("error", (error) => {
-      console.error(error, "VAPI_ERROR");
-      setIsConnecting(false);
-    });
-
-    vapiInstance.on("message", (message) => {
-      if (
-        message.type === "transcript" &&
-        message.transcriptType === "final"
-      ) {
-        setTranscript((prev) => [
-          ...prev,
-          {
-            role: message.role === "user" ? "user" : "assistant",
-            text: message.transcript,
-          },
-        ]);
+  const bindWithRetry = useCallback(
+    async (reservationId: Id<"voiceCallReservations">, providerCallId: string): Promise<boolean> => {
+      if (!contactSessionId) return false;
+      for (let attempt = 0; attempt <= BIND_RETRY_DELAYS_MS.length; attempt++) {
+        try {
+          const result = await reportCallStarted({ contactSessionId, reservationId, providerCallId });
+          if (result.ok) return true;
+          if (!result.retryable) return false;
+        } catch (error) {
+          if (errorCode(error) !== "RATE_LIMITED") return false;
+        }
+        const delay = BIND_RETRY_DELAYS_MS[attempt];
+        if (delay === undefined) break;
+        await sleep(delay);
       }
-    });
-
-    return () => {
-      vapiInstance.stop();
-    };
-  }, [vapiSecrets]);
+      return false;
+    },
+    [contactSessionId, reportCallStarted],
+  );
 
   const startCall = async () => {
-    const assistantId = widgetSettings?.vapiSettings?.assistantId;
+    if (!organizationId || !contactSessionId || isConnecting || isConnected || startingRef.current) return;
+    startingRef.current = true;
 
-    if (
-      !vapi ||
-      !vapiSecrets ||
-      !assistantId ||
-      !organizationId ||
-      !contactSessionId ||
-      isConnecting ||
-      isConnected
-    ) {
-      return;
-    }
-
+    setNotice(null);
     setIsConnecting(true);
 
     try {
-      const result = await authorizeVoice({
-        organizationId,
-        contactSessionId,
+      const paid = await authorizePaid({ contactSessionId });
+      const grant: Grant = {
+        token: paid.token,
+        assistantId: paid.assistantId,
+        reservationId: paid.reservationId as Id<"voiceCallReservations">,
+      };
+
+      const instance = new Vapi(grant.token);
+      vapiRef.current = instance;
+
+      instance.on("call-start", () => {
+        setIsConnected(true);
+        setIsConnecting(false);
+        setTranscript([]);
+      });
+      instance.on("call-end", () => {
+        setIsConnected(false);
+        setIsConnecting(false);
+        setIsSpeaking(false);
+      });
+      instance.on("speech-start", () => setIsSpeaking(true));
+      instance.on("speech-end", () => setIsSpeaking(false));
+      instance.on("error", () => {
+        setNotice("The voice call ran into a problem.");
+        setIsConnecting(false);
+      });
+      instance.on("message", (message) => {
+        if (message.type === "transcript" && message.transcriptType === "final") {
+          setTranscript((prev) => [...prev, { role: message.role === "user" ? "user" : "assistant", text: message.transcript }]);
+        }
       });
 
-      if (!result.allowed) {
-        setShowPaywall(true);
-        setIsConnecting(false);
-        return;
-      }
+      const call = await instance.start(grant.assistantId);
 
-      await vapi.start(assistantId);
+      if (grant.reservationId) {
+        const providerCallId = call?.id;
+        const bound = providerCallId ? await bindWithRetry(grant.reservationId, providerCallId) : false;
+        if (!bound) {
+          // Unverifiable calls must not run: end it rather than leave it outside budget control.
+          teardown();
+          setIsConnected(false);
+          setIsConnecting(false);
+          setNotice("We couldn't start the voice call securely. Please try again.");
+        }
+      }
     } catch (error) {
-      console.error(error, "VOICE_AUTHORIZATION_ERROR");
+      teardown();
       setIsConnecting(false);
+      setNotice(visitorMessage(error, "Voice is not available right now. You can still chat with us."));
+    } finally {
+      startingRef.current = false;
     }
   };
 
   const endCall = () => {
-    vapi?.stop();
+    vapiRef.current?.stop();
   };
 
-  const closePaywall = () => {
-    setShowPaywall(false);
-  };
+  const dismissNotice = () => setNotice(null);
 
-  return {
-    isSpeaking,
-    isConnecting,
-    isConnected,
-    transcript,
-    startCall,
-    endCall,
-    showPaywall,
-    closePaywall,
-  };
+  return { isSpeaking, isConnecting, isConnected, transcript, startCall, endCall, notice, dismissNotice };
 };

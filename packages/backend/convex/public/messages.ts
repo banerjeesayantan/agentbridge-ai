@@ -13,6 +13,7 @@ export const create = action({
     prompt: v.string(),
     threadId: v.string(),
     contactSessionId: v.id("contactSessions"),
+    requestId: v.string(),
   },
   handler: async (ctx, args) => {
     const contactSession = await ctx.runQuery(
@@ -84,6 +85,7 @@ export const create = action({
     const usage = await ctx.runMutation(internal.system.usage.consume, {
       organizationId: conversation.organizationId,
       metric: "aiMessages",
+      requestId: args.requestId,
     });
 
     if (!usage.allowed) {
@@ -94,18 +96,42 @@ export const create = action({
       return;
     }
 
-    await supportAgent.generateText(
-      ctx,
-      { threadId: args.threadId },
-      {
-        prompt: args.prompt,
-        tools: {
-          escalateConversationTool: escalateConversation,
-          resolveConversationTool: resolveConversation,
-          searchTool: search,
+    try {
+      await supportAgent.generateText(
+        ctx,
+        { threadId: args.threadId },
+        {
+          prompt: args.prompt,
+          tools: {
+            escalateConversationTool: escalateConversation,
+            resolveConversationTool: resolveConversation,
+            searchTool: search,
+          },
         },
-      },
-    );
+      );
+    } catch (error) {
+      try {
+        await ctx.runMutation(internal.system.usage.refund, {
+          organizationId: conversation.organizationId,
+          requestId: args.requestId,
+        });
+      } catch (refundError) {
+        console.error("Failed to refund conversation AI usage:", refundError);
+      }
+
+      try {
+        await ctx.runMutation(internal.system.conversations.escalate, {
+          threadId: args.threadId,
+        });
+      } catch (escalationError) {
+        console.error("Failed to escalate conversation after AI failure:", escalationError);
+      }
+
+      throw new ConvexError({
+        code: "SERVICE_UNAVAILABLE",
+        message: "The AI assistant could not respond. Your request has been handed to the support team.",
+      });
+    }
   },
 });
 
