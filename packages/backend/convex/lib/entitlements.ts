@@ -6,7 +6,7 @@
  * defined here: they come from the real Polar products at runtime.
  */
 import type { QueryCtx } from "../_generated/server";
-
+import { ConvexError } from "convex/values";
 export const PLAN_KEYS = ["free", "pro", "enterprise"] as const;
 export type PlanKey = (typeof PLAN_KEYS)[number];
 export type PaidPlanKey = Exclude<PlanKey, "free">;
@@ -21,7 +21,22 @@ export interface PlanLimits {
   /** Clerk organization member cap. */
   members: number;
 }
-
+export function limitError(
+  resource: string,
+  used: number,
+  limit: number,
+  resetsAt: number,
+) {
+  return {
+    code: "LIMIT_REACHED",
+    message: `${resource} limit reached (${used}/${limit}). Upgrade your plan or wait until ${new Date(resetsAt).toISOString().slice(0, 10)} when it resets.`,
+    metric: resource,
+    resource,
+    used,
+    limit,
+    resetsAt,
+  };
+}
 export const PLANS: Record<PlanKey, { name: string; limits: PlanLimits }> = {
   free: {
     name: "Free",
@@ -148,13 +163,3 @@ export async function getEntitlements(
   return resolveEntitlements(sub, now);
 }
 
-export function limitError(metric: string, used: number, limit: number, resetsAt: number) {
-  return {
-    code: "LIMIT_REACHED" as const,
-    message: `Your plan's ${metric} limit (${limit}) has been reached. It resets on ${new Date(resetsAt).toISOString().slice(0, 10)}, or upgrade your plan to continue.`,
-    metric,
-    used,
-    limit,
-    resetsAt,
-  };
-}

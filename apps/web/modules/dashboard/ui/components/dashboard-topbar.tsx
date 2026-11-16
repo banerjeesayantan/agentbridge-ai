@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
 import { PanelLeftIcon } from "lucide-react";
 import { SidebarTrigger } from "@workspace/ui/components/sidebar";
@@ -14,14 +16,24 @@ export const DashboardTopbar = () => {
         <PanelLeftIcon className="size-5" />
       </SidebarTrigger>
 
-      <a href="/" className="flex min-w-0 items-center gap-2">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-lg font-bold text-sidebar-primary-foreground">
-          A
-        </span>
+      <Link
+        href="/"
+        className="flex min-w-0 items-center gap-2"
+        aria-label="Go to AgentBridge dashboard"
+      >
+        <Image
+          src="/AgentBridge_logo.png"
+          alt="AgentBridge logo"
+          width={36}
+          height={36}
+          priority
+          className="size-9 shrink-0 object-contain"
+        />
+
         <span className="truncate text-lg font-semibold tracking-tight">
           AgentBridge
         </span>
-      </a>
+      </Link>
 
       <div className="flex-1" />
 

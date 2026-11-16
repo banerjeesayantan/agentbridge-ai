@@ -11,6 +11,8 @@ export class PolarApiError extends Error {
   }
 }
 
+export const POLAR_TIMEOUT_MS = 8_000;
+
 export const polarBaseUrl = () =>
   polarServer() === "production" ? "https://api.polar.sh" : "https://sandbox-api.polar.sh";
 
@@ -22,7 +24,9 @@ export async function polarRequest<T>(
   const token = process.env.POLAR_ACCESS_TOKEN;
   if (!token) throw new Error("POLAR_ACCESS_TOKEN is not configured");
 
+  // Never hang an action on a slow provider.
   const res = await fetchImpl(`${polarBaseUrl()}${path}`, {
+    signal: AbortSignal.timeout(POLAR_TIMEOUT_MS),
     method: init.method,
     headers: {
       Authorization: `Bearer ${token}`,
@@ -54,3 +58,7 @@ export const checkoutBody = (p: CheckoutParams) => ({
   success_url: p.successUrl,
   return_url: p.returnUrl,
 });
+
+/** Fetch one subscription (used by the reconcile job). */
+export const getSubscription = (id: string, fetchImpl: typeof fetch = fetch) =>
+  polarRequest<unknown>(`/v1/subscriptions/${encodeURIComponent(id)}`, { method: "GET" }, fetchImpl);
