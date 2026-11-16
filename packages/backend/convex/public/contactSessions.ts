@@ -40,8 +40,8 @@ export const create = action({
     organizationId: v.string(),
     metadata: metadataValidator,
   },
-  handler: async (ctx, args) => {
-    if (!clerkSecretKey) {
+handler: async (ctx, args): Promise<Id<"contactSessions">> => {    
+  if (!clerkSecretKey) {
       throw new ConvexError({
         code: "SERVICE_UNAVAILABLE",
         message: "Organization verification is not configured.",
@@ -72,7 +72,7 @@ export const validate = mutation({
   args: {
     contactSessionId: v.id("contactSessions"),
   },
-handler: async (ctx, args): Promise<Id<"contactSessions">> => {    
+handler: async (ctx, args): Promise<{ valid: boolean }> => {    
    
     const contactSession = await ctx.db.get(args.contactSessionId);
 
