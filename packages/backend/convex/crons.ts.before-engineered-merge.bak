@@ -1,0 +1,13 @@
+import { cronJobs } from "convex/server";
+import { internal } from "./_generated/api";
+
+const crons = cronJobs();
+
+crons.interval(
+  "release unused voice holds",
+  { minutes: 5 },
+  internal.system.voiceWallet.expireHolds,
+  {},
+);
+
+export default crons;

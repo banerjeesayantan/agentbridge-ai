@@ -25,8 +25,6 @@ export const WidgetVoiceScreen = () => {
     startCall,
     endCall,
     isConnecting,
-    showPaywall,
-    closePaywall,
   } = useVapi();
 
   return (
@@ -113,45 +111,6 @@ export const WidgetVoiceScreen = () => {
         </div>
       </div>
 
-      {showPaywall && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-sm rounded-xl border bg-background p-6 shadow-xl">
-            <div className="flex flex-col gap-y-4">
-              <div>
-                <h2 className="text-lg font-semibold">Voice trial used</h2>
-
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Your free voice trial has already been used. Upgrade to a paid
-                  plan to continue using voice chat.
-                </p>
-              </div>
-
-              <div className="flex gap-x-2">
-                <Button
-                  className="flex-1"
-                  variant="outline"
-                  onClick={closePaywall}
-                >
-                  Close
-                </Button>
-
-                <Button
-                  className="flex-1"
-                  onClick={() => {
-                    window.open(
-                      "http://localhost:3000/billing",
-                      "_blank",
-                      "noopener,noreferrer",
-                    );
-                  }}
-                >
-                  Upgrade
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 };

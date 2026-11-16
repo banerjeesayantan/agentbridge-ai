@@ -1,5 +1,4 @@
 "use client";
-
 import { AISuggestion, AISuggestions } from "@workspace/ui/components/ai/suggestion";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -8,12 +7,19 @@ import { useThreadMessages, toUIMessages } from "@convex-dev/agent/react";
 import { WidgetHeader } from "@/modules/widget/ui/components/widget-header";
 import { Button } from "@workspace/ui/components/button";
 import { useAtomValue, useSetAtom } from "jotai";
-import { ArrowLeftIcon, MenuIcon } from "lucide-react";
+import {
+  ArrowLeftIcon,
+  XIcon,
+  ThumbsUp,
+  ThumbsDown,
+} from "lucide-react";
+import { useAction, useMutation, useQuery } from "convex/react";
+import type { Id } from "@workspace/backend/_generated/dataModel";
+import { useEffect, useMemo, useState } from "react";
 import { DicebearAvatar } from "@workspace/ui/components/dicebear-avatar";
 import { useInfiniteScroll } from "@workspace/ui/hooks/use-infinite-scroll";
 import { InfiniteScrollTrigger } from "@workspace/ui/components/infinite-scroll-trigger";
 import { contactSessionIdAtomFamily, conversationIdAtom, organizationIdAtom, screenAtom, widgetSettingsAtom } from "../../atoms/widget-atoms";
-import { useAction, useQuery } from "convex/react";
 import { api } from "@workspace/backend/_generated/api";
 import { Form, FormField } from "@workspace/ui/components/form";
 import {
@@ -33,11 +39,197 @@ import {
   AIMessageContent,
 } from "@workspace/ui/components/ai/message";
 import { AIResponse } from "@workspace/ui/components/ai/response";
-import { useMemo } from "react";
+import { errorCode, visitorMessage } from "../../lib/errors";
+import { isEmbedded, postToParent } from "../../lib/embed-messages";
 
 const formSchema = z.object({
-  message: z.string().min(1, "Message is required"),
+  message: z.string().min(1, "Message is required").max(4000, "Message is too long"),
 });
+
+type MessageFeedbackProps = {
+  conversationId: Id<"conversations">;
+  contactSessionId: Id<"contactSessions">;
+  messageId: string;
+  initialRating?: "positive" | "negative";
+};
+
+const MessageFeedback = ({
+  conversationId,
+  contactSessionId,
+  messageId,
+  initialRating,
+}: MessageFeedbackProps) => {
+  const submitFeedback = useMutation(api.public.feedback.submit);
+
+  const [rating, setRating] = useState<"positive" | "negative" | null>(
+    initialRating ?? null,
+  );
+  const [comment, setComment] = useState("");
+  const [commentOpen, setCommentOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [feedbackError, setFeedbackError] = useState<string | null>(null);
+  const [commentSaved, setCommentSaved] = useState(false);
+
+  useEffect(() => {
+    setRating(initialRating ?? null);
+  }, [initialRating]);
+
+  const handleRating = async (nextRating: "positive" | "negative") => {
+    if (submitting) return;
+
+    setSubmitting(true);
+    setFeedbackError(null);
+    setCommentSaved(false);
+
+    try {
+      await submitFeedback({
+        conversationId,
+        contactSessionId,
+        messageId,
+        rating: nextRating,
+      });
+
+      setRating(nextRating);
+      setCommentOpen(true);
+    } catch (error) {
+      console.error("Failed to submit message feedback:", error);
+      setFeedbackError(
+        error instanceof Error ? error.message : "Unable to save feedback.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCommentSubmit = async () => {
+    if (!rating || submitting || !comment.trim()) return;
+
+    setSubmitting(true);
+    setFeedbackError(null);
+
+    try {
+      await submitFeedback({
+        conversationId,
+        contactSessionId,
+        messageId,
+        rating,
+        comment: comment.trim(),
+      });
+
+      setCommentSaved(true);
+      setCommentOpen(false);
+    } catch (error) {
+      // Visitors are not the account owner: never show plan/billing wording to them.
+      setFeedbackError(
+        errorCode(error) === "PLAN_REQUIRED"
+          ? "Written comments aren't available right now. Your rating was saved."
+          : visitorMessage(error, "Unable to save comment."),
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-2 px-2 py-1">
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          aria-label="Helpful response"
+          aria-pressed={rating === "positive"}
+          disabled={submitting}
+          onClick={() => handleRating("positive")}
+          className={`rounded p-1 transition-colors ${
+            rating === "positive"
+              ? "text-primary"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <ThumbsUp className="size-4" />
+        </button>
+
+        <button
+          type="button"
+          aria-label="Unhelpful response"
+          aria-pressed={rating === "negative"}
+          disabled={submitting}
+          onClick={() => handleRating("negative")}
+          className={`rounded p-1 transition-colors ${
+            rating === "negative"
+              ? "text-primary"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <ThumbsDown className="size-4" />
+        </button>
+
+        {rating && !commentOpen && !commentSaved && (
+          <button
+            type="button"
+            onClick={() => setCommentOpen(true)}
+            className="text-xs text-muted-foreground hover:text-foreground"
+          >
+            Add a comment
+          </button>
+        )}
+
+        {commentSaved && (
+          <span className="text-xs text-muted-foreground">
+            Comment saved
+          </span>
+        )}
+      </div>
+
+      {commentOpen && (
+        <div className="space-y-2">
+          <textarea
+            value={comment}
+            onChange={(event) => setComment(event.target.value)}
+            maxLength={2000}
+            rows={3}
+            placeholder="Tell us how we could improve this response..."
+            className="w-full resize-none rounded-md border bg-background p-2 text-sm outline-none focus:ring-1 focus:ring-primary"
+          />
+
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">
+              {comment.length}/2000
+            </span>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={() => {
+                  setCommentOpen(false);
+                  setFeedbackError(null);
+                }}
+                className="text-xs text-muted-foreground"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                disabled={submitting || !comment.trim()}
+                onClick={handleCommentSubmit}
+                className="rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground disabled:opacity-50"
+              >
+                {submitting ? "Saving..." : "Submit comment"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {feedbackError && (
+        <p role="alert" className="text-xs text-destructive">
+          {feedbackError}
+        </p>
+      )}
+    </div>
+  );
+};
 
 export const WidgetChatScreen = () => {
   const setScreen = useSetAtom(screenAtom);
@@ -73,8 +265,26 @@ export const WidgetChatScreen = () => {
       ? {
           conversationId,
           contactSessionId,
-        } 
+        }
       : "skip"
+  );
+
+  const feedbackRecords = useQuery(
+    api.public.feedback.getForConversation,
+    conversationId && contactSessionId
+      ? { conversationId, contactSessionId }
+      : "skip",
+  );
+
+  const feedbackByMessageId = useMemo(
+    () =>
+      new Map(
+        (feedbackRecords ?? []).map((record) => [
+          record.messageId,
+          record.rating,
+        ]),
+      ),
+    [feedbackRecords],
   );
 
   const messages = useThreadMessages(
@@ -102,18 +312,27 @@ export const WidgetChatScreen = () => {
   });
 
   const createMessage = useAction(api.public.messages.create);
+  const [sendError, setSendError] = useState<string | null>(null);
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     if (!conversation || !contactSessionId) {
       return;
     }
 
     form.reset();
+    setSendError(null);
 
-    await createMessage({
-      threadId: conversation.threadId,
-      prompt: values.message,
-      contactSessionId,
-    });
+    try {
+      await createMessage({
+        threadId: conversation.threadId,
+        prompt: values.message,
+        contactSessionId,
+        requestId: crypto.randomUUID(),
+      });
+    } catch (error) {
+      // The visitor's message is saved server-side before any AI work, so even
+      // a failure here never loses it; explain what happened instead of failing silently.
+      setSendError(visitorMessage(error, "Your message could not be sent. Please try again."));
+    }
   };
 
   return (
@@ -124,17 +343,22 @@ export const WidgetChatScreen = () => {
             onClick={onBack}
             size="icon"
             variant="transparent"
+            aria-label="Back"
           >
             <ArrowLeftIcon />
           </Button>
           <p>Chat</p>
         </div>
-        <Button
-          size="icon"
-          variant="transparent"
-        >
-          <MenuIcon />
-        </Button>
+        {isEmbedded() && (
+          <Button
+            size="icon"
+            variant="transparent"
+            aria-label="Close chat"
+            onClick={() => postToParent({ type: "close" })}
+          >
+            <XIcon />
+          </Button>
+        )}
       </WidgetHeader>
       <AIConversation>
         <AIConversationContent>
@@ -144,15 +368,15 @@ export const WidgetChatScreen = () => {
             onLoadMore={handleLoadMore}
             ref={topElementRef}
           />
-          {toUIMessages(messages.results ?? [])?.map((message) => {
-            return (
+          {toUIMessages(messages.results ?? [])?.map((message) => (
+            <div key={message.id}>
               <AIMessage
                 from={message.role === "user" ? "user" : "assistant"}
-                key={message.id}
               >
                 <AIMessageContent>
                   <AIResponse>{message.content}</AIResponse>
                 </AIMessageContent>
+
                 {message.role === "assistant" && (
                   <DicebearAvatar
                     imageUrl="/logo.svg"
@@ -161,8 +385,20 @@ export const WidgetChatScreen = () => {
                   />
                 )}
               </AIMessage>
-            )
-          })}
+
+              {message.role === "assistant" &&
+                message.status === "success" &&
+                conversationId &&
+                contactSessionId && (
+                  <MessageFeedback
+                    conversationId={conversationId}
+                    contactSessionId={contactSessionId}
+                    messageId={message.id}
+                    initialRating={feedbackByMessageId.get(message.id)}
+                  />
+                )}
+            </div>
+          ))}
         </AIConversationContent>
       </AIConversation>
       {toUIMessages(messages.results ?? [])?.length === 1 && (
@@ -189,43 +425,48 @@ export const WidgetChatScreen = () => {
           })}
         </AISuggestions>
       )}
+      {sendError && (
+        <p role="alert" className="border-t bg-destructive/10 px-4 py-2 text-sm text-destructive">
+          {sendError}
+        </p>
+      )}
       <Form {...form}>
-          <AIInput
-            className="rounded-none border-x-0 border-b-0"
-            onSubmit={form.handleSubmit(onSubmit)}
-          >
-            <FormField
-              control={form.control}
-              disabled={conversation?.status === "resolved"}
-              name="message"
-              render={({ field }) => (
-                <AIInputTextarea
-                  disabled={conversation?.status === "resolved"}
-                  onChange={field.onChange}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      form.handleSubmit(onSubmit)();
-                    }
-                  }}
-                  placeholder={
-                    conversation?.status === "resolved"
-                      ? "This conversation has been resolved."
-                      : "Type your message..."
+        <AIInput
+          className="rounded-none border-x-0 border-b-0"
+          onSubmit={form.handleSubmit(onSubmit)}
+        >
+          <FormField
+            control={form.control}
+            disabled={conversation?.status === "resolved"}
+            name="message"
+            render={({ field }) => (
+              <AIInputTextarea
+                disabled={conversation?.status === "resolved"}
+                onChange={field.onChange}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    form.handleSubmit(onSubmit)();
                   }
-                  value={field.value}
-                />
-              )}
-            />
-            <AIInputToolbar>
-              <AIInputTools />
-              <AIInputSubmit
-                disabled={conversation?.status === "resolved" || !form.formState.isValid}
-                status="ready"
-                type="submit"
+                }}
+                placeholder={
+                  conversation?.status === "resolved"
+                    ? "This conversation has been resolved."
+                    : "Type your message..."
+                }
+                value={field.value}
               />
-            </AIInputToolbar>
-          </AIInput>
+            )}
+          />
+          <AIInputToolbar>
+            <AIInputTools />
+            <AIInputSubmit
+              disabled={conversation?.status === "resolved" || !form.formState.isValid}
+              status="ready"
+              type="submit"
+            />
+          </AIInputToolbar>
+        </AIInput>
       </Form>
     </>
   );

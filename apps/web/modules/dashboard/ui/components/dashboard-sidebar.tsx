@@ -4,6 +4,7 @@ import { useOrganization } from "@clerk/nextjs";
 import {
   CreditCardIcon,
   FlaskConicalIcon,
+  MessageSquareTextIcon,
   InboxIcon,
   LayoutDashboardIcon,
   LibraryBigIcon,
@@ -33,6 +34,11 @@ const customerSupportItems = [
     title: "Conversations",
     url: "/conversations",
     icon: InboxIcon,
+  },
+  {
+    title: "Feedback",
+    url: "/feedback",
+    icon: MessageSquareTextIcon,
   },
   {
     title: "Knowledge Base",

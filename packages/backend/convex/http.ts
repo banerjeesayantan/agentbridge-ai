@@ -3,21 +3,37 @@ import type { WebhookEvent } from "@clerk/backend";
 import { httpRouter } from "convex/server";
 import { internal } from "./_generated/api";
 import { httpAction } from "./_generated/server";
-
+import { vapiWebhook } from "./vapiWebhookHttp";
 const http = httpRouter();
 
 http.route({
   path: "/clerk-webhook",
   method: "POST",
-  handler: httpAction(async (_ctx, request) => {
+  handler: httpAction(async (ctx, request) => {
     const event = await validateRequest(request);
 
     if (!event) {
       return new Response("Error occurred", { status: 400 });
     }
 
-    // Subscriptions are managed by Polar, not Clerk Billing.
-    console.log("Ignored Clerk webhook event", event.type);
+    // Keep the organization mirror in sync. Subscriptions are managed by Polar,
+    // not Clerk Billing, so other events are ignored.
+    switch (event.type) {
+      case "organization.created":
+      case "organization.updated":
+        await ctx.runMutation(internal.system.organizations.upsert, {
+          clerkOrgId: event.data.id,
+          name: event.data.name,
+        });
+        break;
+      case "organization.deleted":
+        if (event.data.id) {
+          await ctx.runMutation(internal.system.organizations.markDeleted, { clerkOrgId: event.data.id });
+        }
+        break;
+      default:
+        break;
+    }
 
     return new Response(null, { status: 200 });
   }),
@@ -78,4 +94,9 @@ async function validateRequest(
   }
 }
 
+http.route({
+  path: "/vapi/webhook",
+  method: "POST",
+  handler: vapiWebhook,
+});
 export default http;
