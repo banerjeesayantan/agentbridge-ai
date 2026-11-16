@@ -124,6 +124,7 @@ export declare const internal: FilterApi<
   FunctionReference<any, "internal">
 >;
 
+// Component registry generated with Agent and RAG registered in convex.config.ts.
 export declare const components: {
   agent: {
     apiKeys: {
