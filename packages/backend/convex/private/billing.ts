@@ -1,3 +1,4 @@
+import { requireOrg, requireRole } from "../lib/auth";
 import { ConvexError, v } from "convex/values";
 import { internal } from "../_generated/api";
 import { action } from "../_generated/server";
@@ -15,45 +16,13 @@ const env = (name: string) => {
   return value && value.trim() ? value.trim() : undefined;
 };
 
-async function requireOrg(
-  ctx: {
-    auth: {
-      getUserIdentity: () => Promise<any>;
-    };
-  },
+async function requireBillingOrg(
+  ctx: { auth: { getUserIdentity: () => Promise<any> } },
   adminOnly: boolean,
 ) {
+  const auth = adminOnly ? await requireRole(ctx, "admin") : await requireOrg(ctx);
   const identity = await ctx.auth.getUserIdentity();
-
-  if (identity === null) {
-    throw new ConvexError({
-      code: "UNAUTHORIZED",
-      message: "Identity not found",
-    });
-  }
-
-  const orgId = identity.orgId as string;
-
-  if (!orgId) {
-    throw new ConvexError({
-      code: "UNAUTHORIZED",
-      message: "Organization not found",
-    });
-  }
-
-  const role = identity.orgRole as string | undefined;
-
-  if (adminOnly && role && role !== "org:admin") {
-    throw new ConvexError({
-      code: "FORBIDDEN",
-      message: "Only organization admins can manage billing.",
-    });
-  }
-
-  return {
-    identity,
-    orgId,
-  };
+  return { identity, orgId: auth.orgId };
 }
 
 /**
@@ -65,7 +34,7 @@ export const getCatalog = action({
   args: {},
 
   handler: async (ctx) => {
-    await requireOrg(ctx, false);
+    await requireBillingOrg(ctx, false);
 
     const paid: PaidPlanKey[] = ["pro", "enterprise"];
 
@@ -176,10 +145,7 @@ export const createCheckout = action({
     ctx,
     args,
   ): Promise<{ url: string }> => {
-    const { identity, orgId } = await requireOrg(
-      ctx,
-      true,
-    );
+    const { identity, orgId } = await requireBillingOrg(ctx, true);
 
     /*
      * Product IDs are selected only on the server.
@@ -260,14 +226,14 @@ export const createCheckout = action({
              * The Polar webhook does that.
              */
             successUrl:
-              `${base}/dashboard?checkout=success`,
+              `${base}/billing?checkout=success`,
 
             /*
              * User cancels checkout:
              * return them to dashboard without changing plan.
              */
             returnUrl:
-              `${base}/dashboard?checkout=cancelled`,
+              `${base}/billing?checkout=cancelled`,
           }),
         },
       );
@@ -315,10 +281,7 @@ export const createPortalSession = action({
   handler: async (
     ctx,
   ): Promise<{ url: string }> => {
-    const { orgId } = await requireOrg(
-      ctx,
-      true,
-    );
+    const { orgId } = await requireBillingOrg(ctx, true);
 
     try {
       if (!env("POLAR_ACCESS_TOKEN")) {

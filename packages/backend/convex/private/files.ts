@@ -1,10 +1,9 @@
+﻿import { requireOrg, requireRole } from "../lib/auth";
 import { ConvexError, v } from "convex/values";
 import { 
   contentHashFromArrayBuffer,
   Entry,
   EntryId,
-  guessMimeTypeFromContents,
-  guessMimeTypeFromExtension,
   vEntryId,
 } from "@convex-dev/rag";
 import { action, mutation, query, QueryCtx } from "../_generated/server";
@@ -14,48 +13,22 @@ import { Id } from "../_generated/dataModel";
 import { paginationOptsValidator } from "convex/server";
 import { internal } from "../_generated/api";
 import { limitError } from "../lib/entitlements";
-import { countKnowledgeFiles } from "../lib/knowledgeFiles";
-
-function guessMimeType(filename: string, bytes: ArrayBuffer): string {
-  return (
-    guessMimeTypeFromExtension(filename) ||
-    guessMimeTypeFromContents(bytes) ||
-    "application/octet-stream"
-  );
-};
+import { INPUT, assertOptionalText } from "../lib/limits";
+import { validateUpload } from "../lib/fileValidation";
 
 export const deleteFile = mutation({
   args: {
     entryId: vEntryId,
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    
-    if (identity === null) {
-      throw new ConvexError({
-        code: "UNAUTHORIZED",
-        message: "Identity not found",
-      });
-    }
-
-    const orgId = identity.orgId as string;
-
-    if (!orgId) {
-      throw new ConvexError({
-        code: "UNAUTHORIZED",
-        message: "Organization not found",
-      });
-    }
+    const { orgId } = await requireRole(ctx, "admin");
 
     const namespace = await rag.getNamespace(ctx, {
       namespace: orgId,
     });
 
     if (!namespace) {
-      throw new ConvexError({
-        code: "UNAUTHORIZED",
-        message: "Invalid namespace",
-      });
+      throw new ConvexError({ code: "NOT_FOUND", message: "Not found" });
     }
 
     const entry = await rag.getEntry(ctx, {
@@ -71,8 +44,8 @@ export const deleteFile = mutation({
 
     if (entry.metadata?.uploadedBy !== orgId) {
       throw new ConvexError({
-        code: "UNAUTHORIZED",
-        message: "Invalid Organization ID",
+        code: "NOT_FOUND",
+        message: "Not found",
       });
     }
 
@@ -89,89 +62,129 @@ export const deleteFile = mutation({
 export const addFile = action({
   args: {
     filename: v.string(),
-    mimeType: v.string(),
+    // Accepted for backwards compatibility with older clients; IGNORED. The
+    // type is derived and verified server-side (lib/fileValidation.ts).
+    mimeType: v.optional(v.string()),
     bytes: v.bytes(),
     category: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    
-    if (identity === null) {
-      throw new ConvexError({
-        code: "UNAUTHORIZED",
-        message: "Identity not found",
-      });
-    }
+    const { orgId } = await requireRole(ctx, "admin");
 
-    const orgId = identity.orgId as string;
-
-    if (!orgId) {
-      throw new ConvexError({
-        code: "UNAUTHORIZED",
-        message: "Organization not found",
-      });
-    }
+    const check = validateUpload(args.filename, args.bytes);
+    if (!check.ok) throw new ConvexError({ code: "BAD_REQUEST", message: check.reason });
+    const category = assertOptionalText(args.category, INPUT.NAME_MAX, "category");
 
     const entitlements = await ctx.runQuery(internal.system.subscriptions.getEntitlements, {
       organizationId: orgId,
     });
 
-    const fileCount = await countKnowledgeFiles(
-      ctx,
-      orgId,
-      entitlements.limits.knowledgeFiles,
-    );
-
-    if (fileCount >= entitlements.limits.knowledgeFiles) {
-      throw new ConvexError(
-        limitError(
-          "knowledge-base file",
-          fileCount,
-          entitlements.limits.knowledgeFiles,
-          entitlements.periodEnd,
-        ),
-      );
+    // Atomic limit check + reservation (no check-then-act race).
+    const slot = await ctx.runMutation(internal.system.fileUploads.reserveSlot, {
+      organizationId: orgId,
+      key: check.filename,
+      limit: entitlements.limits.knowledgeFiles,
+    });
+    if (!slot.ok) {
+      throw new ConvexError(limitError("knowledge-base file", slot.used, slot.limit, entitlements.periodEnd));
     }
 
-    const { bytes, filename, category } = args;
+    // Model-based extraction (images, PDFs, HTML) is a metered AI operation.
+    const metered = check.kind !== "text";
+    const requestId = `ingest:${slot.slotId}`;
+    let storageId: Id<"_storage"> | undefined;
+    let charged = false;
+    let committed = false;
 
-    const mimeType = args.mimeType || guessMimeType(filename, bytes);
-    const blob = new Blob([bytes], { type: mimeType });
+    try {
+      if (metered) {
+        const usage = await ctx.runMutation(internal.system.usage.consume, {
+          organizationId: orgId,
+          metric: "aiMessages",
+          requestId,
+        });
+        if (!usage.allowed) {
+          throw new ConvexError(limitError("AI message", usage.used, usage.limit, usage.resetsAt));
+        }
+        charged = true;
+      }
 
-    const storageId = await ctx.storage.store(blob);
+      storageId = await ctx.storage.store(new Blob([args.bytes], { type: check.mimeType }));
 
-    const text = await extractTextContent(ctx, {
-      storageId,
-      filename,
-      bytes,
-      mimeType,
-    });
+      const text = await extractTextContent(ctx, {
+        storageId,
+        filename: check.filename,
+        bytes: args.bytes,
+        mimeType: check.mimeType,
+      });
 
-    const { entryId, created } = await rag.add(ctx, {
-      // SUPER IMPORTANT: What search space to add this to. You cannot search across namespaces,
-      // If not added, it will be considered global (we do not want this)
-      namespace: orgId,
-      text,
-      key: filename,
-      title: filename,
-      metadata: {
-        storageId, // Important for file deletion
-        uploadedBy: orgId, // Important for deletion
-        filename,
-        category: category ?? null,
-      } as EntryMetadata,
-      contentHash: await contentHashFromArrayBuffer(bytes) // To avoid re-inserting if the file content hasn't changed
-    });
+      const { entryId, created, replacedEntry } = await rag.add(ctx, {
+        // SUPER IMPORTANT: What search space to add this to. You cannot search across namespaces,
+        // If not added, it will be considered global (we do not want this)
+        namespace: orgId,
+        text,
+        key: check.filename,
+        title: check.filename,
+        metadata: {
+          storageId, // Important for file deletion
+          uploadedBy: orgId, // Important for deletion
+          filename: check.filename,
+          category: category ?? null,
+        } as EntryMetadata,
+        contentHash: await contentHashFromArrayBuffer(args.bytes), // To avoid re-inserting if the file content hasn't changed
+      });
+      committed = true;
 
-    if (!created) {
-      console.debug("entry already exists, skipping upload metadata");
-      await ctx.storage.delete(storageId);
+      if (!created) {
+        // Duplicate content is already indexed. Blob cleanup is best-effort.
+        await ctx.storage.delete(storageId).catch((error) => {
+          console.error("ALERT: duplicate upload blob cleanup failed", String(error).slice(0, 200));
+        });
+      } else {
+        // Replacing a same-named file must not orphan the previous blob.
+        const oldStorageId = (replacedEntry?.metadata as EntryMetadata | undefined)?.storageId;
+        if (oldStorageId && oldStorageId !== storageId) {
+          await ctx.storage.delete(oldStorageId).catch((error) => {
+            console.error("ALERT: replaced upload blob cleanup failed", String(error).slice(0, 200));
+          });
+        }
+      }
+
+      return { entryId };
+    } catch (error) {
+      if (!committed && storageId) await ctx.storage.delete(storageId).catch(() => {});
+            if (!committed && charged) {
+        await ctx.runMutation(internal.system.usage.refund, {
+          organizationId: orgId,
+          requestId,
+        });
+      }
+      if (error instanceof ConvexError) throw error;
+      console.error("ALERT: knowledge file ingestion failed", { organizationId: orgId, error: String(error).slice(0, 300) });
+      throw new ConvexError({ code: "BAD_GATEWAY", message: "The file could not be processed. You were not charged." });
+    } finally {
+      await ctx.runMutation(internal.system.fileUploads.releaseSlot, { slotId: slot.slotId });
     }
+  },
+});
 
-    return {
-      url: await ctx.storage.getUrl(storageId),
-      entryId,
-    };
+/**
+ * Download link for one knowledge file. Ownership is enforced here, at
+ * issuance, instead of listing permanent storage URLs to every caller.
+ */
+export const getDownloadUrl = action({
+  args: { entryId: vEntryId },
+  handler: async (ctx, args): Promise<string> => {
+    const { orgId } = await requireOrg(ctx);
+    const namespace = await rag.getNamespace(ctx, { namespace: orgId });
+    const entry = namespace ? await rag.getEntry(ctx, { entryId: args.entryId }) : null;
+    const metadata = entry?.metadata as EntryMetadata | undefined;
+    if (!namespace || !entry || metadata?.uploadedBy !== orgId || !metadata.storageId) {
+      throw new ConvexError({ code: "NOT_FOUND", message: "Not found" });
+    }
+    const url = await ctx.storage.getUrl(metadata.storageId);
+    if (!url) throw new ConvexError({ code: "NOT_FOUND", message: "Not found" });
+    return url;
   },
 });
 
@@ -181,23 +194,7 @@ export const list = query({
     paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    
-    if (identity === null) {
-      throw new ConvexError({
-        code: "UNAUTHORIZED",
-        message: "Identity not found",
-      });
-    }
-
-    const orgId = identity.orgId as string;
-
-    if (!orgId) {
-      throw new ConvexError({
-        code: "UNAUTHORIZED",
-        message: "Organization not found",
-      });
-    }
+    const { orgId } = await requireOrg(ctx);
 
     const namespace = await rag.getNamespace(ctx, {
       namespace: orgId,
@@ -234,7 +231,6 @@ export type PublicFile = {
   type: string;
   size: string;
   status: "ready" | "processing" | "error";
-  url: string | null;
   category?: string;
 };
 
@@ -275,15 +271,12 @@ async function convertEntryToPublicFile(
     status = "processing"
   }
 
-  const url = storageId ? await ctx.storage.getUrl(storageId) : null;
-
   return {
     id: entry.entryId,
     name: filename,
     type: extension,
     size: fileSize,
     status,
-    url,
     category: metadata?.category || undefined,
   };
 };
@@ -299,3 +292,4 @@ function formatFileSize(bytes: number): string {
 
   return `${Number.parseFloat((bytes / k ** i).toFixed(1))} ${sizes[i]}`;
 };
+

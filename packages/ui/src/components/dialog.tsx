@@ -131,7 +131,6 @@ function DialogDescription({
 
 export {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -140,4 +139,4 @@ export {
   DialogPortal,
   DialogTitle,
   DialogTrigger,
-}
+};
