@@ -8,10 +8,13 @@ export const getByOrganizationId = query({
   handler: async (ctx, args) => {
     const organizationId = assertOrgId(args.organizationId);
     const claims = await verifyWidgetInstallToken(args.installToken, organizationId);
+    const organization = await ctx.db.query("organizations")
+      .withIndex("by_clerk_org_id", (q) => q.eq("clerkOrgId", organizationId))
+      .first();
     const settings = await ctx.db.query("widgetSettings")
       .withIndex("by_organization_id", (q) => q.eq("organizationId", organizationId))
       .unique();
-    if (!settings || !(settings.allowedOrigins ?? []).includes(claims.origin)) {
+    if (organization?.status !== "active" || !settings || !(settings.allowedOrigins ?? []).includes(claims.origin)) {
       throw new ConvexError({ code: "UNAUTHORIZED", message: "Widget origin is no longer authorized." });
     }
     return {
