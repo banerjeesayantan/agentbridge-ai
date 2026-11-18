@@ -30,6 +30,7 @@ export const consume = internalMutation({
     metric: METRIC,
     amount: v.optional(v.number()),
     requestId: v.string(),
+    operationKey: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const amount = args.amount ?? 1;
@@ -40,6 +41,9 @@ export const consume = internalMutation({
     const prior = await findEvent(ctx, args.organizationId, args.requestId);
 
     if (prior && prior.status !== "refunded") {
+      if (args.operationKey && prior.operationKey !== args.operationKey) {
+        throw new Error("requestId is already bound to a different operation");
+      }
       return { allowed: true as const, duplicate: true, limit, resetsAt: ent.periodEnd };
     }
 
@@ -67,6 +71,7 @@ export const consume = internalMutation({
     const event = {
       organizationId: args.organizationId,
       requestId: args.requestId,
+      ...(args.operationKey ? { operationKey: args.operationKey } : {}),
       metric: args.metric,
       units: amount,
       status: "committed" as const,
