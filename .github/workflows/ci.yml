@@ -39,7 +39,7 @@ jobs:
       - name: Run backend policy tests
         run: pnpm test
 
-       - name: Run backend Vitest suites
+      - name: Run backend Vitest suites
         run: pnpm --dir packages/backend exec vitest run convex
 
       - name: Typecheck Convex backend
