@@ -39,8 +39,8 @@ jobs:
       - name: Run backend policy tests
         run: pnpm test
 
-      - name: Run backend Vitest suites
-        run: pnpm --dir packages/backend exec vitest run
+       - name: Run backend Vitest suites
+        run: pnpm --dir packages/backend exec vitest run convex
 
       - name: Typecheck Convex backend
         run: pnpm exec tsc --noEmit -p packages/backend/convex/tsconfig.json
