@@ -40,6 +40,7 @@ const HIDE_ANIMATION_MS = 300;
   let hideTimer: number | undefined;
   let showTimer: number | undefined;
   let listening = false;
+  let renderGeneration = 0;
 
   let organizationId: string | null = null;
   let position: Position = EMBED_CONFIG.DEFAULT_POSITION;
@@ -79,6 +80,7 @@ const HIDE_ANIMATION_MS = 300;
   }
 
   async function render() {
+    const generation = ++renderGeneration;
     const orgId = organizationId!;
     const side = position === 'bottom-right' ? 'right: 20px;' : 'left: 20px;';
     const transition = reduceMotion ? 'none' : 'all 0.2s ease';
@@ -148,6 +150,7 @@ const HIDE_ANIMATION_MS = 300;
       if (!response.ok) throw new Error(await response.text());
       const authorization = await response.json() as { token?: string };
       if (!authorization.token) throw new Error("Widget authorization response was invalid.");
+      if (generation !== renderGeneration) return;
       nextIframe.src = buildWidgetUrl(orgId, authorization.token);
       nextIframe.style.cssText = `
         width: 100%;
@@ -163,9 +166,13 @@ const HIDE_ANIMATION_MS = 300;
       // Never leave a half-mounted widget behind.
       nextButton.remove();
       nextContainer.remove();
-      throw error;
+      if (generation === renderGeneration) {
+        console.error(`${LOG_PREFIX} could not load the authorized widget.`, error);
+      }
+      return;
     }
 
+    if (generation !== renderGeneration) return;
     button = nextButton;
     container = nextContainer;
     iframe = nextIframe;
@@ -250,6 +257,7 @@ const HIDE_ANIMATION_MS = 300;
   }
 
   function destroy() {
+    renderGeneration += 1;
     clearTimers();
     if (listening) {
       window.removeEventListener('message', handleMessage);
@@ -295,8 +303,7 @@ const HIDE_ANIMATION_MS = 300;
 
     try {
       const mount = () => {
-        render();
-        if (wasOpen) show();
+        void render().then(() => { if (wasOpen && isMounted()) show(); });
       };
       if (document.readyState === 'loading') {
         // Defer, but keep a single mount: destroy() cancels nothing here, so
