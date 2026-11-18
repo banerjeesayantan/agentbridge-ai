@@ -71,7 +71,7 @@ export const consume = internalMutation({
     const event = {
       organizationId: args.organizationId,
       requestId: args.requestId,
-      ...(args.operationKey ? { operationKey: args.operationKey } : {}),
+      operationKey: args.operationKey,
       metric: args.metric,
       units: amount,
       status: "committed" as const,
