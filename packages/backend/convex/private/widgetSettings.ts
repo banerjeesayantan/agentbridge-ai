@@ -30,7 +30,6 @@ export const upsert = mutation({
       await ctx.db.patch(existingWidgetSettings._id, {
         greetMessage: args.greetMessage,
         allowedOrigins,
-        allowedOrigins,
         defaultSuggestions: args.defaultSuggestions,
         vapiSettings: args.vapiSettings,
       });
@@ -38,6 +37,7 @@ export const upsert = mutation({
       await ctx.db.insert("widgetSettings", {
         organizationId: orgId,
         greetMessage: args.greetMessage,
+        allowedOrigins,
         defaultSuggestions: args.defaultSuggestions,
         vapiSettings: args.vapiSettings,
       });
