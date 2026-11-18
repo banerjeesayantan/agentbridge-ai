@@ -14,7 +14,7 @@ export function normalizeAllowedOrigins(values: string[]): string[] {
     try { url = new URL(raw.trim()); } catch {
       throw new ConvexError({ code: "BAD_REQUEST", message: `Invalid origin: ${raw}` });
     }
-    const local = LOCAL_ORIGINS.has(url.origin) && (url.port === "3000" || url.port === "3001" || url.port === "3002" || url.port === "5173" || url.port === "");
+    const local = LOCAL_ORIGINS.has(`http://${url.hostname}`) && url.protocol === "http:" && ["", "3000", "3001", "3002", "5173"].includes(url.port);
     if (url.protocol !== "https:" && !local) {
       throw new ConvexError({ code: "BAD_REQUEST", message: "Widget origins must use HTTPS (HTTP is allowed only for localhost development)." });
     }
