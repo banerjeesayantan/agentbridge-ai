@@ -4,6 +4,8 @@ import { ConvexError, v } from "convex/values";
 import { internal } from "../_generated/api";
 import { action, mutation } from "../_generated/server";
 import { isContactSessionActive } from "../lib/contactSessionPolicy";
+import { RATE, INPUT, assertText, assertEmail } from "../lib/limits";
+import { rateLimited } from "../lib/rateLimit";
 import type { Id } from "../_generated/dataModel";
 
 const clerkSecretKey = process.env.CLERK_SECRET_KEY;
@@ -41,6 +43,15 @@ export const create = action({
     metadata: metadataValidator,
   },
   handler: async (ctx, args): Promise<Id<"contactSessions">> => {
+    const name = assertText(args.name, INPUT.NAME_MAX, "name");
+    const email = assertEmail(args.email);
+    const organizationId = assertText(args.organizationId, INPUT.ORG_ID_MAX, "organizationId");
+    const gate = await ctx.runMutation(internal.system.rateLimit.take, {
+      key: `session:create:org:${organizationId}`,
+      ...RATE.sessionCreateOrg,
+    });
+    if (!gate.ok) rateLimited(gate.retryAfterMs);
+
     if (!clerkSecretKey) {
       throw new ConvexError({
         code: "SERVICE_UNAVAILABLE",
@@ -50,7 +61,7 @@ export const create = action({
 
     try {
       await clerkClient.organizations.getOrganization({
-        organizationId: args.organizationId,
+        organizationId,
       });
     } catch {
       throw new ConvexError({
@@ -61,7 +72,7 @@ export const create = action({
 
     return await ctx.runMutation(
       internal.system.contactSessions.create,
-      args,
+      { ...args, name, email, organizationId },
     );
   },
 });
