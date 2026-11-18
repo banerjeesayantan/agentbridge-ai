@@ -47,7 +47,7 @@ export const CustomizationForm = ({
     defaultValues: {
       greetMessage:
         initialData?.greetMessage || "Hi! How can I help you today?",
-      allowedOrigins: (initialData?.allowedOrigins ?? []).join("\\n"),
+      allowedOrigins: (initialData?.allowedOrigins ?? []).join("\n"),
       defaultSuggestions: {
         suggestion1: initialData?.defaultSuggestions.suggestion1 || "",
         suggestion2: initialData?.defaultSuggestions.suggestion2 || "",
@@ -73,7 +73,7 @@ export const CustomizationForm = ({
             : values.vapiSettings.phoneNumber,
       };
 
-      const allowedOrigins = values.allowedOrigins.split(/[\\n,]+/).map((origin) => origin.trim()).filter(Boolean);
+      const allowedOrigins = values.allowedOrigins.split(/[\n,]+/).map((origin) => origin.trim()).filter(Boolean);
 
       await upsertWidgetSettings({
         greetMessage: values.greetMessage,
@@ -130,7 +130,7 @@ export const CustomizationForm = ({
                 <FormItem>
                   <FormLabel>Allowed website origins</FormLabel>
                   <FormControl>
-                    <Textarea {...field} rows={4} placeholder={"https://example.com\\nhttps://app.example.com"} />
+                    <Textarea {...field} rows={4} placeholder={"https://example.com\nhttps://app.example.com"} />
                   </FormControl>
                   <FormDescription>
                     One origin per line. Include the scheme and hostname only; no paths. HTTPS is required except localhost during development. Only these websites can initialize this widget.
