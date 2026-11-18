@@ -4,7 +4,68 @@ import { httpRouter } from "convex/server";
 import { internal } from "./_generated/api";
 import { httpAction } from "./_generated/server";
 import { vapiWebhook } from "./vapiWebhookHttp";
+import { assertOrgId } from "./lib/limits";
+import { signWidgetInstallToken } from "./lib/widgetOrigin";
 const http = httpRouter();
+
+http.route({
+  path: "/widget/bootstrap",
+  method: "GET",
+  handler: httpAction(async (ctx, request) => {
+    const requestUrl = new URL(request.url);
+    const rawOrganizationId = requestUrl.searchParams.get("organizationId") ?? "";
+    const origin = request.headers.get("origin");
+    let organizationId: string;
+    try {
+      organizationId = assertOrgId(rawOrganizationId);
+    } catch {
+      return new Response("Invalid organization", { status: 400, headers: { "Cache-Control": "no-store" } });
+    }
+    if (!origin || origin === "null") {
+      return new Response("A browser origin is required", { status: 403, headers: { "Cache-Control": "no-store" } });
+    }
+    let parsedOrigin: URL;
+    try {
+      parsedOrigin = new URL(origin);
+      if (parsedOrigin.origin !== origin || (parsedOrigin.protocol !== "https:" && parsedOrigin.hostname !== "localhost" && parsedOrigin.hostname !== "127.0.0.1")) throw new Error("Invalid origin");
+    } catch {
+      return new Response("Invalid origin", { status: 403, headers: { "Cache-Control": "no-store" } });
+    }
+    const gate = await ctx.runMutation(internal.system.rateLimit.take, {
+      key: `widget-bootstrap:${organizationId}:${origin}`,
+      capacity: 30,
+      refillPerSecond: 0.5,
+    });
+    if (!gate.ok) return new Response("Too many requests", { status: 429, headers: { "Cache-Control": "no-store", "Retry-After": String(Math.max(1, Math.ceil(gate.retryAfterMs / 1000))) } });
+
+    const config = await ctx.runQuery(internal.system.widgetInstallations.getConfig, { organizationId });
+    if (!config || !config.allowedOrigins.includes(origin)) {
+      return new Response("This website is not authorized to use this widget", { status: 403, headers: { "Cache-Control": "no-store" } });
+    }
+
+    const issuedAt = Date.now();
+    let token: string;
+    try {
+      token = await signWidgetInstallToken({ organizationId, origin, issuedAt, expiresAt: issuedAt + 5 * 60_000 });
+    } catch (error) {
+      console.error("Widget installation token signing is not configured", error);
+      return new Response("Widget authorization is unavailable", { status: 503, headers: { "Cache-Control": "no-store" } });
+    }
+
+    return new Response(JSON.stringify({ token, expiresAt: issuedAt + 5 * 60_000 }), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": origin,
+        "Vary": "Origin",
+        "Cache-Control": "no-store, private",
+        "Pragma": "no-cache",
+      },
+    });
+  }),
+});
+
+
 const MAX_WEBHOOK_BODY_BYTES = 1_000_000;
 
 async function readLimitedBody(request: Request, maxBytes: number): Promise<string | null> {
