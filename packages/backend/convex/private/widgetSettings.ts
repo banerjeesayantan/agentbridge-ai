@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { ConvexError, v } from "convex/values";
 import { mutation, query } from "../_generated/server";
 import { requireRole } from "../lib/auth";
 
@@ -18,7 +18,7 @@ export const upsert = mutation({
   handler: async (ctx, args) => {
     const { orgId } = await requireRole(ctx, "admin");
 
-        const existingWidgetSettings = await ctx.db
+    const existingWidgetSettings = await ctx.db
       .query("widgetSettings")
       .withIndex("by_organization_id", (q) => q.eq("organizationId", orgId))
       .unique();
