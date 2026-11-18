@@ -24,6 +24,7 @@ import { Doc } from "@workspace/backend/_generated/dataModel";
 import {
   contactSessionIdAtomFamily,
   organizationIdAtom,
+  installTokenAtom,
   screenAtom,
 } from "../../atoms/widget-atoms";
 
@@ -36,6 +37,7 @@ type FormValues = z.infer<typeof formSchema>;
 
 export const WidgetAuthScreen = () => {
   const organizationId = useAtomValue(organizationIdAtom);
+  const installToken = useAtomValue(installTokenAtom);
   const setScreen = useSetAtom(screenAtom);
 
   const setContactSessionId = useSetAtom(
@@ -55,7 +57,7 @@ export const WidgetAuthScreen = () => {
   });
 
   const onSubmit = async (values: FormValues) => {
-    if (!organizationId) {
+    if (!organizationId || !installToken) {
       form.setError("root", {
         message: "Support is currently unavailable. Please try again later.",
       });
@@ -81,6 +83,7 @@ export const WidgetAuthScreen = () => {
       const contactSessionId = await createContactSession({
         ...values,
         organizationId,
+        installToken,
         metadata,
       });
 
