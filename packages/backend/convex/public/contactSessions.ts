@@ -26,8 +26,8 @@ const metadataValidator = v.optional(
 );
 
 /**
- * Verify the organization with Clerk before creating a visitor session.
- * The database write is restricted to the internal mutation.
+ * Verify the signed installation token and current origin allowlist before
+ * creating a visitor session. The database write stays internal.
  */
 export const create = action({
   args: {
