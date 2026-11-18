@@ -17,10 +17,6 @@ export const getByOrganizationId = query({
     if (organization?.status !== "active" || !settings || !(settings.allowedOrigins ?? []).includes(claims.origin)) {
       throw new ConvexError({ code: "UNAUTHORIZED", message: "Widget origin is no longer authorized." });
     }
-    return {
-      greetMessage: settings.greetMessage,
-      defaultSuggestions: settings.defaultSuggestions,
-      vapiSettings: settings.vapiSettings,
-    };
+    return settings;
   },
 });
