@@ -1,22 +1,19 @@
 import { ConvexError, v } from "convex/values";
-import { query } from "../_generated/server";
+import { internal } from "../_generated/api";
+import { action } from "../_generated/server";
 import { assertOrgId } from "../lib/limits";
 import { verifyWidgetInstallToken } from "../lib/widgetOrigin";
 
-export const getByOrganizationId = query({
+export const getByOrganizationId = action({
   args: { organizationId: v.string(), installToken: v.string() },
   handler: async (ctx, args) => {
     const organizationId = assertOrgId(args.organizationId);
     const claims = await verifyWidgetInstallToken(args.installToken, organizationId);
-    const organization = await ctx.db.query("organizations")
-      .withIndex("by_clerk_org_id", (q) => q.eq("clerkOrgId", organizationId))
-      .first();
-    const settings = await ctx.db.query("widgetSettings")
-      .withIndex("by_organization_id", (q) => q.eq("organizationId", organizationId))
-      .unique();
-    if (organization?.status !== "active" || !settings || !(settings.allowedOrigins ?? []).includes(claims.origin)) {
-      throw new ConvexError({ code: "UNAUTHORIZED", message: "Widget origin is no longer authorized." });
-    }
+    const settings = await ctx.runQuery(internal.system.widgetInstallations.getSettings, {
+      organizationId,
+      origin: claims.origin,
+    });
+    if (!settings) throw new ConvexError({ code: "UNAUTHORIZED", message: "Widget origin is no longer authorized." });
     return settings;
   },
 });
