@@ -3,7 +3,7 @@ import type { WebhookEvent } from "@clerk/backend";
 import { httpRouter } from "convex/server";
 import { internal } from "./_generated/api";
 import { httpAction } from "./_generated/server";
-import { vapiWebhook } from "./vapiWebhookHttp";
+import { vapiWebhook } from "./features/voice/http/vapiWebhookHttp";
 import { assertOrgId } from "./lib/limits";
 import { signWidgetInstallToken } from "./lib/widgetOrigin";
 const http = httpRouter();

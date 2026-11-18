@@ -11,7 +11,7 @@
  * Costs still pending are counted, not valued: `provisional` is true while any
  * exist, so contribution is never presented as final with an unknown cost.
  */
-import { DEFAULT_ALLOCATION, splitByBasisPoints, type AllocationPart } from "./money";
+import { DEFAULT_ALLOCATION, splitByBasisPoints, type AllocationPart } from "../../../lib/money";
 
 export interface RevenueEntryLite {
   kind: "payment" | "refund" | "platform_fee";

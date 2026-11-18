@@ -25,7 +25,7 @@ const fmtDuration = (seconds: number | null) =>
   seconds === null ? "n/a" : `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`;
 
 export const VoiceUsagePanel = () => {
-  const summary = useQuery(api.private.voiceBilling.summary);
+  const summary = useQuery(api.features.voice.private.voiceBilling.summary);
 
   if (summary === undefined) {
     return (

@@ -1,12 +1,12 @@
 import { v } from "convex/values";
-import type { Doc, Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../../../_generated/dataModel";
 import {
   internalMutation,
   internalQuery,
   type MutationCtx,
-} from "../_generated/server";
-import { getEntitlements } from "../lib/entitlements";
-import { isMicro } from "../lib/money";
+} from "../../../_generated/server";
+import { getEntitlements } from "../../../lib/entitlements";
+import { isMicro } from "../../../lib/money";
 import { holdDeadline, readVoiceBudgetConfig } from "../lib/voiceBudget";
 
 export type DenyCode =
@@ -892,21 +892,86 @@ export const settlePendingReport = internalMutation({
  * unreserved/unmatched) but NO wallet is debited and no reservation is
  * touched: an unverifiable call must never be charged to a tenant by guess.
  */
+
 export const reconcileUnboundReports = internalMutation({
   args: {},
   handler: async (ctx) => {
     const cutoff = Date.now() - UNBOUND_REPORT_GRACE_MS;
+
     const stale = await ctx.db
       .query("unboundVoiceReports")
-      .withIndex("by_status_and_received_at", (q) => q.eq("status", "pending").lte("receivedAt", cutoff))
+      .withIndex("by_status_and_received_at", (q) =>
+        q.eq("status", "pending").lte("receivedAt", cutoff),
+      )
       .take(100);
 
+    let unmatched = 0;
+    let settled = 0;
+    let deferred = 0;
+
     for (const report of stale) {
+      // First check whether this exact provider call has since been
+      // verified and bound to a reservation.
+      const reservation = await ctx.db
+        .query("voiceCallReservations")
+        .withIndex("by_provider_call_id", (q) =>
+          q.eq("providerCallId", report.providerCallId),
+        )
+        .first();
+
+      if (reservation) {
+        // Never classify a bound call as an unreserved platform expense.
+        // Reuse the same settlement core and idempotency key as
+        // settlePendingReport.
+        const providerReport: ProviderReport = {
+          providerCallId: report.providerCallId,
+          assistantId: report.assistantId,
+          costMicro: report.costMicro,
+          rawCostUsd: report.rawCostUsd,
+          durationSeconds: report.durationSeconds,
+          startedAtMs: report.startedAtMs,
+          endedAtMs: report.endedAtMs,
+          endedReason: report.endedReason,
+          overridesDetected: report.overridesDetected,
+        };
+
+        const result = await settleReport(
+          ctx,
+          `pending:${report.providerCallId}`,
+          providerReport,
+        );
+
+        if (result.ok && result.outcome !== "pending_binding") {
+          await ctx.db.patch(report._id, { status: "settled" });
+          settled++;
+        } else {
+          // Keep it pending so a later cron execution can retry.
+          // Do not create an unmatched platform expense here.
+          deferred++;
+
+          console.error(
+            "ALERT: bound Vapi report settlement deferred",
+            {
+              providerCallId: report.providerCallId,
+              code: result.ok ? result.outcome : result.code,
+            },
+          );
+        }
+
+        continue;
+      }
+
+      // No exact reservation exists. Preserve the original safe
+      // platform-expense handling. Never debit a tenant by guessing.
       const known = report.costMicro !== undefined;
+
       const hasUsage = await ctx.db
         .query("voiceUsage")
-        .withIndex("by_provider_call_id", (q) => q.eq("providerCallId", report.providerCallId))
+        .withIndex("by_provider_call_id", (q) =>
+          q.eq("providerCallId", report.providerCallId),
+        )
         .first();
+
       if (!hasUsage) {
         await ctx.db.insert("voiceUsage", {
           organizationId: report.organizationId,
@@ -924,10 +989,14 @@ export const reconcileUnboundReports = internalMutation({
           createdAt: Date.now(),
         });
       }
+
       const expense = await ctx.db
         .query("providerExpenses")
-        .withIndex("by_provider_call_id", (q) => q.eq("providerCallId", report.providerCallId))
+        .withIndex("by_provider_call_id", (q) =>
+          q.eq("providerCallId", report.providerCallId),
+        )
         .first();
+
       if (!expense) {
         await ctx.db.insert("providerExpenses", {
           kind: "paid_call",
@@ -939,15 +1008,23 @@ export const reconcileUnboundReports = internalMutation({
           createdAt: Date.now(),
         });
       }
-      console.error("ALERT: provider call never bound to a reservation; no wallet debited", {
-        providerCallId: report.providerCallId,
-        organizationId: report.organizationId,
-      });
+
+      console.error(
+        "ALERT: provider call never bound to a reservation; no wallet debited",
+        {
+          providerCallId: report.providerCallId,
+          organizationId: report.organizationId,
+        },
+      );
+
       await ctx.db.patch(report._id, { status: "unmatched" });
+      unmatched++;
     }
-    return { unmatched: stale.length };
+
+    return { unmatched, settled, deferred };
   },
 });
+
 
 /**
  * Reconciliation core.

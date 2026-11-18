@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { internal } from "./_generated/api";
-import { assertLedgerInvariants, newT, seed, stubVoiceEnv, walletFor, type T } from "./finance.testkit";
+import { internal } from "../../../_generated/api";
+import { assertLedgerInvariants, newT, seed, stubVoiceEnv, walletFor, type T } from "../../../finance.testkit";
 
 const SECRET = "whsec_test_secret_value";
 
@@ -55,7 +55,7 @@ const post = (t: T, body: unknown, headers: Record<string, string> = { authoriza
 
 const reserveA = async (t: T) => {
   const s = await seed(t);
-  const reservation = await t.mutation(internal.system.voiceWallet.reserveCall, { contactSessionId: s.A1 });
+  const reservation = await t.mutation(internal.features.voice.internal.voiceWallet.reserveCall, { contactSessionId: s.A1 });
   if (!reservation.ok) throw new Error(`Unable to reserve test call: ${reservation.code}`);
   return { ...s, reservationId: reservation.reservationId };
 };
@@ -66,7 +66,7 @@ const bindReservation = (
   providerCallId = "call_1",
   assistantId = "asst_A",
 ) =>
-  t.mutation(internal.system.voiceWallet.bindCall, {
+  t.mutation(internal.features.voice.internal.voiceWallet.bindCall, {
     reservationId: reservationId as never,
     providerCallId,
     assistantId,
@@ -208,6 +208,28 @@ describe("payload handling", () => {
   });
 });
 
+
+
+it("rejects oversized UTF-8 bodies by byte length, not character count", async () => {
+  const t = newT();
+
+  const body = JSON.stringify({
+    message: { type: "status-update" },
+    padding: "é".repeat(500_000),
+  });
+
+  // The JavaScript string is below 1 MB, but its UTF-8 encoding exceeds 1 MB.
+  expect(body.length).toBeLessThan(1_000_000);
+  expect(new TextEncoder().encode(body).byteLength).toBeGreaterThan(1_000_000);
+
+  const response = await post(t, body);
+
+  expect(response.status).toBe(413);
+  expect(await response.json()).toEqual({
+    error: "payload too large",
+  });
+});
+
 describe("paid calls", () => {
   it("settles using the provider-reported cost and duration, attributing to the mapped organization", async () => {
     const t = newT();
@@ -270,8 +292,8 @@ describe("paid calls", () => {
   it("a call from one organization's assistant never touches another organization's wallet", async () => {
     const t = newT();
     const s = await seed(t);
-    const reservationA = await t.mutation(internal.system.voiceWallet.reserveCall, { contactSessionId: s.A1 });
-    const reservationB = await t.mutation(internal.system.voiceWallet.reserveCall, { contactSessionId: s.B1 });
+    const reservationA = await t.mutation(internal.features.voice.internal.voiceWallet.reserveCall, { contactSessionId: s.A1 });
+    const reservationB = await t.mutation(internal.features.voice.internal.voiceWallet.reserveCall, { contactSessionId: s.B1 });
     if (!reservationA.ok || !reservationB.ok) throw new Error("Unable to reserve cross-organization test calls");
     await bindReservation(t, reservationB.reservationId, "call_B", "asst_B");
     await post(t, report({ id: "call_B", assistantId: "asst_B", cost: 1 }));

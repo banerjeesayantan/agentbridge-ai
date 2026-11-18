@@ -1,10 +1,11 @@
-import { httpAction } from "./_generated/server";
-import { internal } from "./_generated/api";
+
+import { httpAction } from "../../../_generated/server";
+import { internal } from "../../../_generated/api";
 import {
   extractBearerToken,
   parseVapiMessage,
   secretsMatch,
-} from "./lib/vapiWebhook";
+} from "../lib/vapiWebhook";
 
 /**
  * POST /vapi/webhook
@@ -20,26 +21,63 @@ import {
  */
 const MAX_BODY_BYTES = 1_000_000;
 
-async function readLimitedBody(request: Request): Promise<string | null> {
-  const declared = Number(request.headers.get("content-length"));
-  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) return null;
-  if (!request.body) return "";
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
+type BodyReadResult =
+  | { ok: true; raw: string }
+  | { ok: false; reason: "too_large" | "unreadable" };
+
+/**
+ * Reads the request body with a strict byte limit.
+ *
+ * Content-Length is an early-rejection optimization only.
+ * The streamed byte count is authoritative.
+ */
+async function readLimitedBody(
+  request: Request,
+): Promise<BodyReadResult> {
+  const contentLength = request.headers.get("content-length");
+
+  if (
+    contentLength !== null &&
+    /^\d+$/.test(contentLength.trim()) &&
+    Number(contentLength) > MAX_BODY_BYTES
+  ) {
+    return { ok: false, reason: "too_large" };
+  }
+
+  const reader = request.body?.getReader();
+
+  if (!reader) {
+    return { ok: true, raw: "" };
+  }
+
+  const decoder = new TextDecoder("utf-8", { fatal: true });
+
+  let bytesRead = 0;
+  let raw = "";
+
   try {
     while (true) {
       const { done, value } = await reader.read();
+
       if (done) break;
-      total += value.byteLength;
-      if (total > MAX_BODY_BYTES) { await reader.cancel(); return null; }
-      chunks.push(value);
+
+      bytesRead += value.byteLength;
+
+      if (bytesRead > MAX_BODY_BYTES) {
+        await reader.cancel().catch(() => undefined);
+        return { ok: false, reason: "too_large" };
+      }
+
+      raw += decoder.decode(value, { stream: true });
     }
-  } finally { reader.releaseLock(); }
-  const body = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) { body.set(chunk, offset); offset += chunk.byteLength; }
-  return new TextDecoder().decode(body);
+
+    raw += decoder.decode();
+    return { ok: true, raw };
+  } catch {
+    return { ok: false, reason: "unreadable" };
+  } finally {
+    reader.releaseLock();
+  }
 }
 
 const json = (
@@ -64,6 +102,7 @@ export const vapiWebhook = httpAction(async (ctx, request) => {
     return json(500, { error: "webhook not configured" });
   }
 
+  // Authenticate before reading or parsing the request body.
   const token = extractBearerToken(
     request.headers.get("authorization"),
   );
@@ -72,16 +111,20 @@ export const vapiWebhook = httpAction(async (ctx, request) => {
     return json(401, { error: "unauthorized" });
   }
 
-  const raw = await readLimitedBody(request);
+  const bodyResult = await readLimitedBody(request);
 
-  if (raw === null) {
-    return json(413, { error: "payload too large" });
+  if (!bodyResult.ok) {
+    if (bodyResult.reason === "too_large") {
+      return json(413, { error: "payload too large" });
+    }
+
+    return json(400, { error: "invalid request body" });
   }
 
   let body: unknown;
 
   try {
-    body = JSON.parse(raw);
+    body = JSON.parse(bodyResult.raw);
   } catch {
     return json(400, { error: "invalid json" });
   }
@@ -113,7 +156,7 @@ export const vapiWebhook = httpAction(async (ctx, request) => {
     report.assistantId === demoAssistantId
   ) {
     await ctx.runMutation(
-      internal.system.voiceWallet.recordFreeDemoExpense,
+      internal.features.voice.internal.voiceWallet.recordFreeDemoExpense,
       {
         providerCallId: report.providerCallId,
         costMicro: report.costMicro,
@@ -129,7 +172,7 @@ export const vapiWebhook = httpAction(async (ctx, request) => {
   // Managed organization calls are settled against their
   // previously authorized paid-call reservation.
   const settled = await ctx.runMutation(
-    internal.system.voiceWallet.settlePaidCall,
+    internal.features.voice.internal.voiceWallet.settlePaidCall,
     {
       eventKey: `vapi:end-of-call-report:${report.providerCallId}`,
       providerCallId: report.providerCallId,

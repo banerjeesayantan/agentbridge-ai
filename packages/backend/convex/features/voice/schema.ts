@@ -1,18 +1,7 @@
-/**
- * Additive tables for paid voice: tenant wallets, an append-only ledger,
- * reservations, actual usage, provider expenses, and operator controls.
- * Spread into the existing schema:  defineSchema({ ...existing, ...financeTables })
- *
- * All money is an INTEGER number of micro-dollars. Tenant wallets, the central
- * provider balance and expenses are separate tables on purpose: a tenant's
- * wallet is a budget allowance, not cash, and the provider balance is the
- * platform's own money.
- */
 import { defineTable } from "convex/server";
 import { v } from "convex/values";
 
-export const financeTables = {
-  // One row per organization per usage period. Aggregates only; the ledger is the audit trail.
+export const voiceTables = {
   voiceWallets: defineTable({
     organizationId: v.string(),
     periodStart: v.number(),
@@ -23,8 +12,6 @@ export const financeTables = {
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_organization_id_and_period_start", ["organizationId", "periodStart"]),
-
-  // Append-only. Rows are inserted, never patched or deleted. `idempotencyKey` is unique by convention.
   voiceWalletTransactions: defineTable({
     walletId: v.id("voiceWallets"),
     organizationId: v.string(),
@@ -38,7 +25,6 @@ export const financeTables = {
   })
     .index("by_idempotency_key", ["idempotencyKey"])
     .index("by_wallet_id", ["walletId"]),
-
   voiceCallReservations: defineTable({
     organizationId: v.string(),
     contactSessionId: v.id("contactSessions"),
@@ -63,10 +49,6 @@ export const financeTables = {
     .index("by_status_and_hold_deadline", ["status", "holdDeadline"])
     .index("by_contact_session_id", ["contactSessionId"])
     .index("by_provider_call_id", ["providerCallId"]),
-
-  // Provider end-of-call reports that arrived before their call was bound to a
-  // reservation (the webhook can beat the browser's call-started report).
-  // They are settled when a verified binding appears, or marked "unmatched".
   unboundVoiceReports: defineTable({
     providerCallId: v.string(),
     assistantId: v.string(),
@@ -83,8 +65,6 @@ export const financeTables = {
   })
     .index("by_provider_call_id", ["providerCallId"])
     .index("by_status_and_received_at", ["status", "receivedAt"]),
-
-  // Actual provider-reported usage. costMicro is absent while costStatus is "pending": never zero.
   voiceUsage: defineTable({
     organizationId: v.string(),
     providerCallId: v.string(),
@@ -109,8 +89,6 @@ export const financeTables = {
   })
     .index("by_provider_call_id", ["providerCallId"])
     .index("by_organization_id", ["organizationId"]),
-
-  // What the platform actually paid the provider, per call. Separate from tenant wallets.
   providerExpenses: defineTable({
     kind: v.union(v.literal("paid_call"), v.literal("free_demo")),
     providerCallId: v.string(),
@@ -124,8 +102,6 @@ export const financeTables = {
   })
     .index("by_provider_call_id", ["providerCallId"])
     .index("by_cost_status", ["costStatus"]),
-
-  // Singleton row (key "central"): the platform's own Vapi account state.
   providerAccount: defineTable({
     key: v.literal("central"),
     balanceMicro: v.optional(v.number()),
@@ -136,7 +112,6 @@ export const financeTables = {
     updatedAt: v.number(),
     updatedBy: v.string(),
   }).index("by_key", ["key"]),
-
   orgVoiceControls: defineTable({
     organizationId: v.string(),
     suspended: v.boolean(),
@@ -144,7 +119,6 @@ export const financeTables = {
     updatedAt: v.number(),
     updatedBy: v.string(),
   }).index("by_organization_id", ["organizationId"]),
-
   adminAuditLog: defineTable({
     actorUserId: v.string(),
     action: v.string(),
@@ -153,15 +127,11 @@ export const financeTables = {
     detail: v.optional(v.record(v.string(), v.string())),
     createdAt: v.number(),
   }).index("by_created_at", ["createdAt"]),
-
-  // Provider events already applied (idempotency), keyed by e.g. "vapi:end-of-call-report:<callId>".
   processedProviderEvents: defineTable({
     eventKey: v.string(),
     provider: v.string(),
     receivedAt: v.number(),
   }).index("by_event_key", ["eventKey"]),
-
-  // Server-controlled organization -> managed assistant mapping. Never client-supplied.
   managedAssistants: defineTable({
     organizationId: v.string(),
     vapiAssistantId: v.string(),
@@ -170,28 +140,6 @@ export const financeTables = {
   })
     .index("by_organization_id", ["organizationId"])
     .index("by_vapi_assistant_id", ["vapiAssistantId"]),
-
-  // Verified Polar payment events, per organization. Amounts are positive; `kind` gives the sign.
-  //   payment      + net collected (after discounts, before tax), from order.paid
-  //   refund       - refunded net amount, from order.refunded (delta against earlier refunds)
-  //   platform_fee - Polar's reported platform fee on the order (processing fees are NOT separately reported)
-  // Unknown fees are simply absent: the accounting layer labels them "not reported", never zero.
-  revenueEntries: defineTable({
-    eventKey: v.string(),
-    polarOrderId: v.string(),
-    organizationId: v.string(),
-    kind: v.union(v.literal("payment"), v.literal("refund"), v.literal("platform_fee")),
-    amountMicro: v.number(),
-    currency: v.string(),
-    occurredAt: v.number(),
-    createdAt: v.number(),
-  })
-    .index("by_event_key", ["eventKey"])
-    .index("by_polar_order_id", ["polarOrderId"])
-    .index("by_organization_id", ["organizationId"]),
-
-  // Singleton (key "default"): revenue allocation in basis points. Absent => DEFAULT_ALLOCATION.
-  // Durable, append-only alerts for provider costs exceeding reservations or wallet budgets.
   voiceCostAlerts: defineTable({
     organizationId: v.string(),
     providerCallId: v.string(),
@@ -210,10 +158,8 @@ export const financeTables = {
     .index("by_idempotency_key", ["idempotencyKey"])
     .index("by_created_at", ["createdAt"])
     .index("by_organization_id", ["organizationId"]),
-  revenueAllocationSettings: defineTable({
-    key: v.literal("default"),
-    parts: v.array(v.object({ key: v.string(), bps: v.number() })),
-    updatedAt: v.number(),
-    updatedBy: v.string(),
-  }).index("by_key", ["key"]),
+  voiceTrials: defineTable({
+    organizationId: v.string(),
+    usedAt: v.number(),
+  }).index("by_organization_id", ["organizationId"]),
 };

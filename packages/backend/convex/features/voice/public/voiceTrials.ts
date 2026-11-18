@@ -1,8 +1,8 @@
 import { ConvexError, v } from "convex/values";
-import { internal } from "../_generated/api";
-import { action } from "../_generated/server";
-import { RATE } from "../lib/limits";
-import { rateLimited } from "../lib/rateLimit";
+import { internal } from "../../../_generated/api";
+import { action } from "../../../_generated/server";
+import { RATE } from "../../../lib/limits";
+import { rateLimited } from "../../../lib/rateLimit";
 import { loadCentralVapiCredentials } from "../lib/vapiCentral";
 import { signVapiPublicToken } from "../lib/vapiJwt";
 import { readVoiceBudgetConfig } from "../lib/voiceBudget";
@@ -29,7 +29,7 @@ export const authorize = action({
     });
     if (!gate.ok) rateLimited(gate.retryAfterMs);
 
-    const decision = await ctx.runMutation(internal.system.voiceTrials.authorize, args);
+    const decision = await ctx.runMutation(internal.features.voice.internal.voiceTrials.authorize, args);
     if (!decision.allowed || !decision.organizationId) {
       return { allowed: false, reason: decision.reason as "invalid_session" | "use_paid" | "unavailable" | "trial_used" };
     }
@@ -54,7 +54,7 @@ export const authorize = action({
       return { allowed: true, reason: "trial", token, assistantId, expiresAt };
     } catch {
       // No token left the server, so no call can exist: give the trial back.
-      await ctx.runMutation(internal.system.voiceTrials.release, { organizationId: decision.organizationId });
+      await ctx.runMutation(internal.features.voice.internal.voiceTrials.release, { organizationId: decision.organizationId });
       throw new ConvexError({ code: "VOICE_UNAVAILABLE", message: "Voice is temporarily unavailable." });
     }
   },

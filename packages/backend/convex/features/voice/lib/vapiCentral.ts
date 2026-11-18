@@ -8,7 +8,7 @@
  * remove the AWS dependency for the central voice model.
  * The private key is never logged or returned to a client.
  */
-import { getSecretValue, parseSecretString } from "./secrets";
+import { getSecretValue, parseSecretString } from "../../../lib/secrets";
 
 export interface CentralVapiCredentials {
   privateApiKey: string;

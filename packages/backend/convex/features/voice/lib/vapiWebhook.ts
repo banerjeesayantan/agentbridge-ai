@@ -15,7 +15,7 @@
  * therefore never invents a value: anything missing or malformed stays
  * undefined, and an unknown cost stays pending, never zero.
  */
-import { usdToMicro } from "./money";
+import { usdToMicro } from "../../../lib/money";
 
 const encoder = new TextEncoder();
 

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { internal } from "../_generated/api";
-import { newT, type T } from "../finance.testkit";
-import { handlePolarOrderEvent } from "./polarOrderHandler";
+import { internal } from "../../../_generated/api";
+import { newT, type T } from "../../../finance.testkit";
+import { handlePolarOrderEvent } from "../lib/polarOrderHandler";
 
 beforeEach(() => void vi.spyOn(console, "error").mockImplementation(() => {}));
 afterEach(() => {
@@ -24,7 +24,7 @@ const order = (over: Record<string, unknown> = {}) => ({
 const run = (t: T, type: string, data: unknown) =>
   handlePolarOrderEvent(
     { runMutation: (ref, args) => t.mutation(ref, args) },
-    internal.system.revenue.applyPolarOrderEvent,
+    internal.features.revenue.internal.revenue.applyPolarOrderEvent,
     type,
     data,
     "wh_1",

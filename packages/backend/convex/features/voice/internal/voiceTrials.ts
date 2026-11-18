@@ -1,6 +1,6 @@
-import { internalMutation } from "../_generated/server";
+import { internalMutation } from "../../../_generated/server";
 import { v } from "convex/values";
-import { getEntitlements } from "../lib/entitlements";
+import { getEntitlements } from "../../../lib/entitlements";
 
 export type TrialReason = "invalid_session" | "use_paid" | "unavailable" | "trial_used" | "trial";
 

@@ -3,8 +3,8 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { api } from "@workspace/backend/_generated/api";
 
-type PhoneNumbers = typeof api.private.vapi.getPhoneNumbers._returnType;
-type Assistants = typeof api.private.vapi.getAssistants._returnType;
+type PhoneNumbers = typeof api.features.voice.private.vapi.getPhoneNumbers._returnType;
+type Assistants = typeof api.features.voice.private.vapi.getAssistants._returnType;
 
 export const useVapiAssistants = (): {
   data: Assistants;
@@ -15,7 +15,7 @@ export const useVapiAssistants = (): {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  const getAssistants = useAction(api.private.vapi.getAssistants);
+  const getAssistants = useAction(api.features.voice.private.vapi.getAssistants);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,7 +61,7 @@ export const useVapiPhoneNumbers = (): {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
-  const getPhoneNumbers = useAction(api.private.vapi.getPhoneNumbers);
+  const getPhoneNumbers = useAction(api.features.voice.private.vapi.getPhoneNumbers);
 
   useEffect(() => {
     let cancelled = false;

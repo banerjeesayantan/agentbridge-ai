@@ -15,7 +15,7 @@ import { Loader2Icon, MicIcon } from "lucide-react";
 import Link from "next/link";
 
 export const VoiceTrialView = () => {
-  const status = useQuery(api.private.voiceTrials.status);
+  const status = useQuery(api.features.voice.private.voiceTrials.status);
 
   if (status === undefined) {
     return (

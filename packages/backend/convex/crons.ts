@@ -6,14 +6,14 @@ const crons = cronJobs();
 crons.interval(
   "release unused voice holds",
   { minutes: 5 },
-  internal.system.voiceWallet.expireHolds,
+  internal.features.voice.internal.voiceWallet.expireHolds,
   {},
 );
 
 crons.interval(
   "flag provider reports that never got a verified call binding",
   { minutes: 5 },
-  internal.system.voiceWallet.reconcileUnboundReports,
+  internal.features.voice.internal.voiceWallet.reconcileUnboundReports,
   {},
 );
 

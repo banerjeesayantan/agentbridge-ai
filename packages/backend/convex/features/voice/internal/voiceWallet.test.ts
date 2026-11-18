@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { internal } from "../_generated/api";
+import { internal } from "../../../_generated/api";
 import {
   assertLedgerInvariants,
   DAY,
@@ -8,7 +8,7 @@ import {
   stubVoiceEnv,
   walletFor,
   type T,
-} from "../finance.testkit";
+} from "../../../finance.testkit";
 
 const RESERVE = 2_500_000; // 600 s at 250_000 micro-dollars/minute
 
@@ -23,7 +23,7 @@ afterEach(() => {
 });
 
 const reserve = (t: T, contactSessionId: unknown) =>
-  t.mutation(internal.system.voiceWallet.reserveCall, {
+  t.mutation(internal.features.voice.internal.voiceWallet.reserveCall, {
     contactSessionId: contactSessionId as never,
   });
 
@@ -33,14 +33,14 @@ const bind = (
   providerCallId = "call_1",
   assistantId = "asst_A",
 ) =>
-  t.mutation(internal.system.voiceWallet.bindCall, {
+  t.mutation(internal.features.voice.internal.voiceWallet.bindCall, {
     reservationId: reservationId as never,
     providerCallId,
     assistantId,
   });
 
 const settle = (t: T, over: Record<string, unknown> = {}) =>
-  t.mutation(internal.system.voiceWallet.settlePaidCall, {
+  t.mutation(internal.features.voice.internal.voiceWallet.settlePaidCall, {
     eventKey: "vapi:end-of-call-report:call_1",
     providerCallId: "call_1",
     assistantId: "asst_A",
@@ -402,7 +402,7 @@ describe("settlement: actual provider cost, never reservations, never zero for u
     ).toHaveLength(0);
 
     const reconciled = await t.mutation(
-      internal.system.voiceWallet.recordActualCost,
+      internal.features.voice.internal.voiceWallet.recordActualCost,
       { providerCallId: "call_1", costMicro: 20_000_000 },
     );
     expect(reconciled).toEqual({ ok: true, outcome: "settled" });
@@ -441,7 +441,7 @@ describe("settlement: actual provider cost, never reservations, never zero for u
 
     expect(
       await t.mutation(
-        internal.system.voiceWallet.recordActualCost,
+        internal.features.voice.internal.voiceWallet.recordActualCost,
         { providerCallId: "call_1", costMicro: 20_000_000 },
       ),
     ).toEqual({ ok: true, outcome: "duplicate" });
@@ -468,12 +468,12 @@ describe("settlement: actual provider cost, never reservations, never zero for u
     await settle(t, { costMicro: undefined, rawCostUsd: undefined });
 
     const first = await t.mutation(
-      internal.system.voiceWallet.recordActualCost,
+      internal.features.voice.internal.voiceWallet.recordActualCost,
       { providerCallId: "call_1", costMicro: 800_000 },
     );
     expect(first).toEqual({ ok: true, outcome: "settled" });
     const second = await t.mutation(
-      internal.system.voiceWallet.recordActualCost,
+      internal.features.voice.internal.voiceWallet.recordActualCost,
       { providerCallId: "call_1", costMicro: 800_000 },
     );
     expect(second).toEqual({ ok: true, outcome: "duplicate" });
@@ -602,19 +602,19 @@ describe("settlement: actual provider cost, never reservations, never zero for u
     const t = newT();
     await seed(t);
     expect(
-      await t.mutation(internal.system.voiceWallet.recordActualCost, {
+      await t.mutation(internal.features.voice.internal.voiceWallet.recordActualCost, {
         providerCallId: "nope",
         costMicro: 1,
       }),
     ).toEqual({ ok: false, code: "UNKNOWN_CALL" });
     expect(
-      await t.mutation(internal.system.voiceWallet.recordActualCost, {
+      await t.mutation(internal.features.voice.internal.voiceWallet.recordActualCost, {
         providerCallId: "nope",
         costMicro: -1,
       }),
     ).toEqual({ ok: false, code: "INVALID" });
     expect(
-      await t.mutation(internal.system.voiceWallet.recordActualCost, {
+      await t.mutation(internal.features.voice.internal.voiceWallet.recordActualCost, {
         providerCallId: "nope",
         costMicro: 1.5,
       }),
@@ -705,16 +705,75 @@ describe("settlement: actual provider cost, never reservations, never zero for u
     await assertLedgerInvariants(t);
   });
 
-  it("flags a call that carried browser assistant overrides", async () => {
+    it("settles a stale pending report when its reservation was subsequently bound", async () => {
+    const T0 = Date.UTC(2026, 10, 17, 12, 0, 0);
+
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(T0);
+
     const t = newT();
-    const s = await seed(t);
+    const s = await seed(t, T0);
     const res = await openOk(t, s.A1);
-    await bind(t, res.reservationId);
-    await settle(t, { overridesDetected: true });
+
+    // The provider report arrives before the reservation is bound.
     expect(
-      (await t.run((ctx) => ctx.db.query("voiceUsage").first()))!
-        .overridesDetected,
-    ).toBe(true);
+      await settle(t, {
+        providerCallId: "call_1",
+        eventKey: "pending:call_1",
+        costMicro: 300_000,
+      }),
+    ).toEqual({ ok: true, outcome: "pending_binding" });
+
+    // Age the report beyond the 15-minute reconciliation grace period.
+    // The reservation hold remains valid at this point.
+    vi.setSystemTime(T0 + 16 * 60 * 1000);
+
+    // Bind the exact provider call, without settling the pending report.
+    await bind(t, res.reservationId, "call_1", "asst_A");
+
+    const result = await t.mutation(
+      internal.features.voice.internal.voiceWallet.reconcileUnboundReports,
+      {},
+    );
+
+    expect(result).toEqual({
+      unmatched: 0,
+      settled: 1,
+      deferred: 0,
+    });
+
+    // The tenant must be charged exactly once.
+    expect(await walletFor(t, "org_A")).toMatchObject({
+      spentMicro: 300_000,
+      reservedMicro: 0,
+    });
+
+    const rows = await t.run(async (ctx) => ({
+      report: await ctx.db.query("unboundVoiceReports").first(),
+      usage: await ctx.db.query("voiceUsage").collect(),
+      expenses: await ctx.db.query("providerExpenses").collect(),
+    }));
+
+    expect(rows.report).toMatchObject({
+      providerCallId: "call_1",
+      status: "settled",
+    });
+
+    expect(rows.usage).toHaveLength(1);
+    expect(rows.usage[0]).toMatchObject({
+      providerCallId: "call_1",
+      costMicro: 300_000,
+      customerChargeMicro: 300_000,
+    });
+    expect(rows.usage[0].unreserved).not.toBe(true);
+
+    expect(rows.expenses).toHaveLength(1);
+    expect(rows.expenses[0]).toMatchObject({
+      providerCallId: "call_1",
+      costMicro: 300_000,
+    });
+
+    await assertLedgerInvariants(t);
   });
 });
 
@@ -732,13 +791,13 @@ describe("unused reservations are released only when no call can still exist", (
 
     vi.setSystemTime(deadline - 1);
     expect(
-      await t.mutation(internal.system.voiceWallet.expireHolds, {}),
+      await t.mutation(internal.features.voice.internal.voiceWallet.expireHolds, {}),
     ).toEqual({ expired: 0 });
     expect((await walletFor(t, "org_A"))!.reservedMicro).toBe(RESERVE);
 
     vi.setSystemTime(deadline);
     expect(
-      await t.mutation(internal.system.voiceWallet.expireHolds, {}),
+      await t.mutation(internal.features.voice.internal.voiceWallet.expireHolds, {}),
     ).toEqual({ expired: 1 });
     expect((await walletFor(t, "org_A"))!.reservedMicro).toBe(0);
     expect((await t.run((ctx) => ctx.db.get(res.reservationId)))!.status).toBe(
@@ -746,7 +805,7 @@ describe("unused reservations are released only when no call can still exist", (
     );
     // Running it again changes nothing.
     expect(
-      await t.mutation(internal.system.voiceWallet.expireHolds, {}),
+      await t.mutation(internal.features.voice.internal.voiceWallet.expireHolds, {}),
     ).toEqual({ expired: 0 });
     await assertLedgerInvariants(t);
   });
@@ -759,7 +818,7 @@ describe("unused reservations are released only when no call can still exist", (
     const res = await openOk(t, s.A1);
     await bind(t, res.reservationId);
     vi.setSystemTime(res.tokenExpiresAt + 720_000);
-    await t.mutation(internal.system.voiceWallet.expireHolds, {});
+    await t.mutation(internal.features.voice.internal.voiceWallet.expireHolds, {});
     await settle(t, { costMicro: 900_000 });
     expect(await walletFor(t, "org_A")).toMatchObject({
       reservedMicro: 0,
@@ -797,12 +856,12 @@ describe("unused reservations are released only when no call can still exist", (
     const s = await seed(t);
     const res = await openOk(t, s.A1);
     expect(
-      await t.mutation(internal.system.voiceWallet.releaseUnissued, {
+      await t.mutation(internal.features.voice.internal.voiceWallet.releaseUnissued, {
         reservationId: res.reservationId,
       }),
     ).toEqual({ released: true });
     expect(
-      await t.mutation(internal.system.voiceWallet.releaseUnissued, {
+      await t.mutation(internal.features.voice.internal.voiceWallet.releaseUnissued, {
         reservationId: res.reservationId,
       }),
     ).toEqual({ released: false });
@@ -812,7 +871,7 @@ describe("unused reservations are released only when no call can still exist", (
     await bind(t, again.reservationId);
     await settle(t);
     expect(
-      await t.mutation(internal.system.voiceWallet.releaseUnissued, {
+      await t.mutation(internal.features.voice.internal.voiceWallet.releaseUnissued, {
         reservationId: again.reservationId,
       }),
     ).toEqual({ released: false });
@@ -877,7 +936,7 @@ describe("free-demo expense tracking (separate from tenant wallets)", () => {
     const t = newT();
 
     expect(
-      await t.mutation(internal.system.voiceWallet.recordFreeDemoExpense, {
+      await t.mutation(internal.features.voice.internal.voiceWallet.recordFreeDemoExpense, {
         providerCallId: "demo_1",
         organizationId: "org_F",
         costMicro: 40_000,
@@ -903,7 +962,7 @@ describe("free-demo expense tracking (separate from tenant wallets)", () => {
   it("keeps an unknown demo cost pending, and fills it in later without duplicating", async () => {
     const t = newT();
 
-    await t.mutation(internal.system.voiceWallet.recordFreeDemoExpense, {
+    await t.mutation(internal.features.voice.internal.voiceWallet.recordFreeDemoExpense, {
       providerCallId: "demo_2",
       organizationId: "org_F",
     });
@@ -912,11 +971,11 @@ describe("free-demo expense tracking (separate from tenant wallets)", () => {
     expect(exp[0]).toMatchObject({ costStatus: "pending" });
     expect(exp[0]!.costMicro).toBeUndefined();
 
-    await t.mutation(internal.system.voiceWallet.recordFreeDemoExpense, {
+    await t.mutation(internal.features.voice.internal.voiceWallet.recordFreeDemoExpense, {
       providerCallId: "demo_2",
       costMicro: 55_000,
     });
-    await t.mutation(internal.system.voiceWallet.recordFreeDemoExpense, {
+    await t.mutation(internal.features.voice.internal.voiceWallet.recordFreeDemoExpense, {
       providerCallId: "demo_2",
       costMicro: 99_000,
     }); // a later value never overwrites a known one
@@ -938,7 +997,7 @@ describe("revenue accounting from verified Polar orders", () => {
     ...over,
   });
   const apply = (t: T, a: ReturnType<typeof paid>) =>
-    t.mutation(internal.system.revenue.applyPolarOrderEvent, a);
+    t.mutation(internal.features.revenue.internal.revenue.applyPolarOrderEvent, a);
   const entries = (t: T) =>
     t.run((ctx) => ctx.db.query("revenueEntries").collect());
 

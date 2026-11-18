@@ -1,12 +1,12 @@
 import { ConvexError, v } from "convex/values";
-import { internal } from "../_generated/api";
-import type { Id } from "../_generated/dataModel";
-import { action } from "../_generated/server";
+import { internal } from "../../../_generated/api";
+import type { Id } from "../../../_generated/dataModel";
+import { action } from "../../../_generated/server";
 import { loadCentralVapiCredentials } from "../lib/vapiCentral";
 import { signVapiPublicToken } from "../lib/vapiJwt";
 import { readVoiceBudgetConfig } from "../lib/voiceBudget";
-import { RATE } from "../lib/limits";
-import { rateLimited } from "../lib/rateLimit";
+import { RATE } from "../../../lib/limits";
+import { rateLimited } from "../../../lib/rateLimit";
 
 /**
  * Paid voice entry point for the browser. The visitor sends ONLY a contact
@@ -52,7 +52,7 @@ export const authorizeCall = action({
     });
     if (!gate.ok) rateLimited(gate.retryAfterMs);
 
-    const reservation = await ctx.runMutation(internal.system.voiceWallet.reserveCall, {
+    const reservation = await ctx.runMutation(internal.features.voice.internal.voiceWallet.reserveCall, {
       contactSessionId: args.contactSessionId,
     });
     // The denial was RETURNED by a committed mutation; only now do we throw.
@@ -83,7 +83,7 @@ export const authorizeCall = action({
       // No token left the server, so no call can exist: release the hold now.
       // A REUSED reservation may already have a live token out, so it is left to expire.
       if (!reservation.reused) {
-        await ctx.runMutation(internal.system.voiceWallet.releaseUnissued, {
+        await ctx.runMutation(internal.features.voice.internal.voiceWallet.releaseUnissued, {
           reservationId: reservation.reservationId,
         });
       }
@@ -118,7 +118,7 @@ export const reportCallStarted = action({
     });
     if (!gate.ok) rateLimited(gate.retryAfterMs);
 
-    const result = await ctx.runAction(internal.system.voiceBinding.bindReportedCall, args);
+    const result = await ctx.runAction(internal.features.voice.internal.voiceBinding.bindReportedCall, args);
     return result.ok ? { ok: true } : { ok: false, retryable: result.retryable, code: result.code };
   },
 });

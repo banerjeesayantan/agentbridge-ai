@@ -1,6 +1,7 @@
-﻿import { defineSchema, defineTable } from "convex/server";
+import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { financeTables } from "./schema.finance";
+import { voiceTables } from "./features/voice/schema";
+import { revenueTables } from "./features/revenue/schema";
 export default defineSchema({
   subscriptions: defineTable({
     organizationId: v.string(),
@@ -109,11 +110,7 @@ export default defineSchema({
   })
   .index("by_organization_id", ["organizationId"])
   .index("by_expires_at", ["expiresAt"]),
-  voiceTrials: defineTable({
-    organizationId: v.string(),
-    usedAt: v.number(),
-  }).index("by_organization_id", ["organizationId"]),
-  users: defineTable({
+users: defineTable({
     name: v.string(),
   }),
   organizations: defineTable({
@@ -151,6 +148,6 @@ export default defineSchema({
     .index("by_organization_id", ["organizationId"])
     .index("by_organization_and_message", ["organizationId", "messageId"])
     .index("by_organization_and_created_at", ["organizationId", "createdAt"]),
-  ...financeTables,
+  ...voiceTables,
+  ...revenueTables,
 });
-

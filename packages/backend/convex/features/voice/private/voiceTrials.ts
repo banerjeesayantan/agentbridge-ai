@@ -1,6 +1,6 @@
 
 import { ConvexError } from "convex/values";
-import { query } from "../_generated/server";
+import { query } from "../../../_generated/server";
 
 /**
  * Customer-facing Free voice trial status.

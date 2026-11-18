@@ -1,9 +1,9 @@
 import { ConvexError, v } from "convex/values";
-import { mutation, query, type MutationCtx } from "../_generated/server";
-import { computeOrgAccounting } from "../lib/accounting";
-import { DEFAULT_ALLOCATION, usdToMicro, validateAllocation } from "../lib/money";
-import { isPlatformAdmin, requirePlatformAdmin } from "../lib/platformAdmin";
-import { applyActualCost } from "../system/voiceWallet";
+import { mutation, query, type MutationCtx } from "../../../_generated/server";
+import { computeOrgAccounting } from "../../revenue/lib/accounting";
+import { DEFAULT_ALLOCATION, usdToMicro, validateAllocation } from "../../../lib/money";
+import { isPlatformAdmin, requirePlatformAdmin } from "../../../lib/platformAdmin";
+import { applyActualCost } from "../internal/voiceWallet";
 
 /**
  * Platform-admin financial operations. EVERY function starts with

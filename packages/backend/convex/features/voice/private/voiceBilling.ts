@@ -1,7 +1,7 @@
-import { requireOrg } from "../lib/auth";
+import { requireOrg } from "../../../lib/auth";
 import { ConvexError } from "convex/values";
-import { query } from "../_generated/server";
-import { getEntitlements } from "../lib/entitlements";
+import { query } from "../../../_generated/server";
+import { getEntitlements } from "../../../lib/entitlements";
 import { readVoiceBudgetConfig } from "../lib/voiceBudget";
 
 /**

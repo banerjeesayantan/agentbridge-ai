@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api, internal } from "../_generated/api";
+import { api, internal } from "../../../_generated/api";
 import { clearCentralVapiCache } from "../lib/vapiCentral";
-import { getSecretValue } from "../lib/secrets";
-import { assertLedgerInvariants, newT, seed, stubVoiceEnv, walletFor } from "../finance.testkit";
+import { getSecretValue } from "../../../lib/secrets";
+import { assertLedgerInvariants, newT, seed, stubVoiceEnv, walletFor } from "../../../finance.testkit";
 
-vi.mock("../lib/secrets", () => ({
+vi.mock("../../../lib/secrets", () => ({
   getSecretValue: vi.fn(),
   parseSecretString: (o: { SecretString?: string }) => (o.SecretString ? JSON.parse(o.SecretString) : null),
 }));
@@ -25,7 +25,7 @@ afterEach(() => {
 
 const b64 = (s: string) => JSON.parse(atob(s.replace(/-/g, "+").replace(/_/g, "/")));
 const authorize = (t: ReturnType<typeof newT>, contactSessionId: unknown) =>
-  t.action(api.public.voicePaid.authorizeCall, { contactSessionId: contactSessionId as never });
+  t.action(api.features.voice.public.voicePaid.authorizeCall, { contactSessionId: contactSessionId as never });
 
 describe("authorizeCall", () => {
   it("settles an early provider report when retrying an already-bound call", async () => {
@@ -33,7 +33,7 @@ describe("authorizeCall", () => {
     const s = await seed(t);
 
     const reservation = await t.mutation(
-      internal.system.voiceWallet.reserveCall,
+      internal.features.voice.internal.voiceWallet.reserveCall,
       { contactSessionId: s.A1 },
     );
 
@@ -43,7 +43,7 @@ describe("authorizeCall", () => {
 
     // The provider webhook arrives before the browser reports its call ID.
     expect(
-      await t.mutation(internal.system.voiceWallet.settlePaidCall, {
+      await t.mutation(internal.features.voice.internal.voiceWallet.settlePaidCall, {
         eventKey: "early-report",
         providerCallId: "call_binding_retry",
         assistantId: "asst_A",
@@ -53,7 +53,7 @@ describe("authorizeCall", () => {
     ).toMatchObject({ ok: true, outcome: "pending_binding" });
 
     // The first attempt committed the binding.
-    await t.mutation(internal.system.voiceWallet.bindCall, {
+    await t.mutation(internal.features.voice.internal.voiceWallet.bindCall, {
       reservationId: reservation.reservationId,
       providerCallId: "call_binding_retry",
       assistantId: "asst_A",
@@ -61,7 +61,7 @@ describe("authorizeCall", () => {
 
     // A retry must settle the parked report despite the existing binding.
     expect(
-      await t.action(internal.system.voiceBinding.bindReportedCall, {
+      await t.action(internal.features.voice.internal.voiceBinding.bindReportedCall, {
         reservationId: reservation.reservationId,
         contactSessionId: s.A1,
         providerCallId: "call_binding_retry",
@@ -159,17 +159,119 @@ describe("authorizeCall", () => {
     expect((await walletFor(t, "org_A"))!.reservedMicro).toBe(2_500_000);
   });
 
+
+
+  it("rejects a provider call belonging to a different Vapi organization", async () => {
+    creds();
+
+    const t = newT();
+    const s = await seed(t);
+    const reservation = await t.mutation(
+      internal.features.voice.internal.voiceWallet.reserveCall,
+      { contactSessionId: s.A1 },
+    );
+
+    if (!reservation.ok) {
+      throw new Error(`Reservation failed: ${reservation.code}`);
+    }
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        id: "call_org_mismatch",
+        orgId: "another-vapi-org",
+        assistantId: reservation.assistantId,
+        type: "webCall",
+        createdAt: new Date().toISOString(),
+      }),
+    } as Response);
+
+    const result = await t.action(
+      internal.features.voice.internal.voiceBinding.bindReportedCall,
+      {
+        reservationId: reservation.reservationId,
+        contactSessionId: s.A1,
+        providerCallId: "call_org_mismatch",
+      },
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      code: "ORG_MISMATCH",
+      retryable: false,
+    });
+
+    const stored = await t.run((ctx) =>
+      ctx.db.get(reservation.reservationId),
+    );
+
+    expect(stored?.providerCallId).toBeUndefined();
+    expect(stored?.status).toBe("authorized");
+
+    expect((await walletFor(t, "org_A"))!.reservedMicro).toBe(2_500_000);
+
+    await assertLedgerInvariants(t);
+  });
+
+  it("accepts a provider call belonging to the configured Vapi organization", async () => {
+    creds();
+
+    const t = newT();
+    const s = await seed(t);
+    const reservation = await t.mutation(
+      internal.features.voice.internal.voiceWallet.reserveCall,
+      { contactSessionId: s.A1 },
+    );
+
+    if (!reservation.ok) {
+      throw new Error(`Reservation failed: ${reservation.code}`);
+    }
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        id: "call_org_match",
+        orgId: "vapi-org-1",
+        assistantId: reservation.assistantId,
+        type: "webCall",
+        createdAt: new Date().toISOString(),
+      }),
+    } as Response);
+
+    const result = await t.action(
+      internal.features.voice.internal.voiceBinding.bindReportedCall,
+      {
+        reservationId: reservation.reservationId,
+        contactSessionId: s.A1,
+        providerCallId: "call_org_match",
+      },
+    );
+
+    expect(result).toEqual({ ok: true, outcome: "bound" });
+
+    const stored = await t.run((ctx) =>
+      ctx.db.get(reservation.reservationId),
+    );
+
+    expect(stored?.providerCallId).toBe("call_org_match");
+    expect(stored?.status).toBe("authorized");
+
+    await assertLedgerInvariants(t);
+  });
+
   it("end to end: authorize, then the provider report settles exactly what was spent", async () => {
     creds();
     const t = newT();
     const s = await seed(t);
     const out = await authorize(t, s.A1);
-    await t.mutation(internal.system.voiceWallet.bindCall, {
+    await t.mutation(internal.features.voice.internal.voiceWallet.bindCall, {
       reservationId: out.reservationId,
       providerCallId: "call_e2e",
       assistantId: out.assistantId,
     });
-    await t.mutation(internal.system.voiceWallet.settlePaidCall, {
+    await t.mutation(internal.features.voice.internal.voiceWallet.settlePaidCall, {
       eventKey: "e", providerCallId: "call_e2e", assistantId: out.assistantId, costMicro: 410_000, overridesDetected: false,
     });
     expect(await walletFor(t, "org_A")).toMatchObject({ reservedMicro: 0, spentMicro: 410_000 });

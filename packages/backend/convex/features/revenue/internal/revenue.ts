@@ -1,6 +1,6 @@
 import { v } from "convex/values";
-import { internalMutation, type MutationCtx } from "../_generated/server";
-import { isMicro } from "../lib/money";
+import { internalMutation, type MutationCtx } from "../../../_generated/server";
+import { isMicro } from "../../../lib/money";
 
 /**
  * Revenue accounting from VERIFIED Polar order events (the webhook has already
