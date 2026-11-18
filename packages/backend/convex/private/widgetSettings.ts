@@ -1,5 +1,6 @@
-import { ConvexError, v } from "convex/values";
+import { v } from "convex/values";
 import { mutation, query } from "../_generated/server";
+import { requireRole } from "../lib/auth";
 
 export const upsert = mutation({
   args: {
@@ -15,25 +16,9 @@ export const upsert = mutation({
     }),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-            
-    if (identity === null) {
-      throw new ConvexError({
-        code: "UNAUTHORIZED",
-        message: "Identity not found",
-      });
-    }
+    const { orgId } = await requireRole(ctx, "admin");
 
-    const orgId = identity.orgId as string;
-
-    if (!orgId) {
-      throw new ConvexError({
-        code: "UNAUTHORIZED",
-        message: "Organization not found",
-      });
-    }
-
-    const existingWidgetSettings = await ctx.db
+        const existingWidgetSettings = await ctx.db
       .query("widgetSettings")
       .withIndex("by_organization_id", (q) => q.eq("organizationId", orgId))
       .unique();
