@@ -86,10 +86,11 @@ export const consume = internalMutation({
 
 /** Reverse a committed consumption (provider failed). Idempotent. */
 export const refund = internalMutation({
-  args: { organizationId: v.string(), requestId: v.string() },
+  args: { organizationId: v.string(), requestId: v.string(), operationKey: v.optional(v.string()) },
   handler: async (ctx, args) => {
     const event = await findEvent(ctx, args.organizationId, args.requestId);
     if (!event || event.status === "refunded") return { refunded: false as const };
+    if (args.operationKey && event.operationKey !== args.operationKey) return { refunded: false as const };
 
     const metric = event.metric ?? "aiMessages";
     const units = event.units ?? 1;
