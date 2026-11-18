@@ -7,6 +7,8 @@ import { escalateConversation } from "../system/ai/tools/escalateConversation";
 import { resolveConversation } from "../system/ai/tools/resolveConversation";
 import { saveMessage } from "@convex-dev/agent";
 import { search } from "../system/ai/tools/search";
+import { RATE, INPUT, assertText } from "../lib/limits";
+import { rateLimited } from "../lib/rateLimit";
 
 export const create = action({
   args: {
@@ -16,6 +18,8 @@ export const create = action({
     requestId: v.string(),
   },
   handler: async (ctx, args) => {
+    const prompt = assertText(args.prompt, INPUT.PROMPT_MAX, "prompt");
+    const requestId = assertText(args.requestId, 128, "requestId");
     const contactSession = await ctx.runQuery(
       internal.system.contactSessions.getOne,
       {
@@ -58,6 +62,14 @@ export const create = action({
       });
     }
 
+    for (const [key, config] of [
+      [`message:session:${args.contactSessionId}`, RATE.messageSession],
+      [`message:org:${contactSession.organizationId}`, RATE.messageOrg],
+    ] as const) {
+      const gate = await ctx.runMutation(internal.system.rateLimit.take, { key, ...config });
+      if (!gate.ok) rateLimited(gate.retryAfterMs);
+    }
+
     // This refreshes the user's session if they are within the threshold
     await ctx.runMutation(internal.system.contactSessions.refresh, {
       contactSessionId: args.contactSessionId,
@@ -68,7 +80,7 @@ export const create = action({
     if (conversation.status !== "unresolved") {
       await saveMessage(ctx, components.agent, {
         threadId: args.threadId,
-        prompt: args.prompt,
+        prompt,
       });
       return;
     }
@@ -85,7 +97,7 @@ export const create = action({
     const usage = await ctx.runMutation(internal.system.usage.consume, {
       organizationId: conversation.organizationId,
       metric: "aiMessages",
-      requestId: args.requestId,
+      requestId,
     });
 
     if (!usage.allowed) {
