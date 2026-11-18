@@ -4,7 +4,7 @@ import { ConvexError, v } from "convex/values";
 import { internal } from "../_generated/api";
 import { action, mutation } from "../_generated/server";
 import { isContactSessionActive } from "../lib/contactSessionPolicy";
-import { RATE, INPUT, assertText, assertEmail } from "../lib/limits";
+import { RATE, INPUT, assertText, assertEmail, assertOrgId } from "../lib/limits";
 import { rateLimited } from "../lib/rateLimit";
 import type { Id } from "../_generated/dataModel";
 
@@ -45,7 +45,7 @@ export const create = action({
   handler: async (ctx, args): Promise<Id<"contactSessions">> => {
     const name = assertText(args.name, INPUT.NAME_MAX, "name");
     const email = assertEmail(args.email);
-    const organizationId = assertText(args.organizationId, INPUT.ORG_ID_MAX, "organizationId");
+    const organizationId = assertOrgId(args.organizationId);
     const gate = await ctx.runMutation(internal.system.rateLimit.take, {
       key: `session:create:org:${organizationId}`,
       ...RATE.sessionCreateOrg,
