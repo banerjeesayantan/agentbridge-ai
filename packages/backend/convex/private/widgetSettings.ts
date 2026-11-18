@@ -1,10 +1,12 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "../_generated/server";
 import { requireRole } from "../lib/auth";
+import { normalizeAllowedOrigins } from "../lib/widgetOrigin";
 
 export const upsert = mutation({
   args: {
     greetMessage: v.string(),
+    allowedOrigins: v.array(v.string()),
     defaultSuggestions: v.object({
       suggestion1: v.optional(v.string()),
       suggestion2: v.optional(v.string()),
@@ -17,6 +19,7 @@ export const upsert = mutation({
   },
   handler: async (ctx, args) => {
     const { orgId } = await requireRole(ctx, "admin");
+    const allowedOrigins = normalizeAllowedOrigins(args.allowedOrigins);
 
     const existingWidgetSettings = await ctx.db
       .query("widgetSettings")
@@ -26,6 +29,8 @@ export const upsert = mutation({
     if (existingWidgetSettings) {
       await ctx.db.patch(existingWidgetSettings._id, {
         greetMessage: args.greetMessage,
+        allowedOrigins,
+        allowedOrigins,
         defaultSuggestions: args.defaultSuggestions,
         vapiSettings: args.vapiSettings,
       });
