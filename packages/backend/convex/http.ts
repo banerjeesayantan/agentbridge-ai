@@ -21,7 +21,7 @@ http.route({
     } catch {
       return new Response("Invalid organization", { status: 400, headers: { "Cache-Control": "no-store" } });
     }
-    if (!origin || origin === "null") {
+    if (!origin || origin === "null" || origin.length > 255) {
       return new Response("A browser origin is required", { status: 403, headers: { "Cache-Control": "no-store" } });
     }
     let parsedOrigin: URL;
@@ -32,7 +32,7 @@ http.route({
       return new Response("Invalid origin", { status: 403, headers: { "Cache-Control": "no-store" } });
     }
     const gate = await ctx.runMutation(internal.system.rateLimit.take, {
-      key: `widget-bootstrap:${organizationId}:${origin}`,
+      key: `widget-bootstrap:${organizationId}`,
       capacity: 30,
       refillPerSecond: 0.5,
     });
