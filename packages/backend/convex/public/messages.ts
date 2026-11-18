@@ -18,7 +18,7 @@ export const create = action({
     requestId: v.string(),
   },
   handler: async (ctx, args) => {
-    const prompt = assertText(prompt, INPUT.PROMPT_MAX, "prompt");
+    const prompt = assertText(args.prompt, INPUT.PROMPT_MAX, "prompt");
     const requestId = assertText(args.requestId, 128, "requestId");
     const contactSession = await ctx.runQuery(
       internal.system.contactSessions.getOne,
