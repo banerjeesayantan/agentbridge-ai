@@ -128,7 +128,8 @@ export const create = action({
       try {
         await ctx.runMutation(internal.system.usage.refund, {
           organizationId: conversation.organizationId,
-          requestId: args.requestId,
+          requestId,
+          operationKey: `widget-message:${args.threadId}:${prompt}`,
         });
       } catch (refundError) {
         console.error("Failed to refund conversation AI usage:", refundError);
