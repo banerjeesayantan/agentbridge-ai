@@ -82,7 +82,10 @@ export function readVoiceBudgetConfig(env: Env): VoiceBudgetConfig {
   const concurrent = optionalInt(env.VOICE_MAX_CONCURRENT_PER_ORG, 1, 1, 20);
   const perSession = optionalInt(env.VOICE_MAX_AUTHORIZATIONS_PER_SESSION, 5, 1, 100);
 
+  const originsSecure = env.NODE_ENV !== "production" || allowedOrigins.every((origin) => origin.startsWith("https://"));
+
   const ready =
+    originsSecure &&
     maxCallSeconds !== null &&
     costPerMinute !== null &&
     allowedOrigins.length > 0 &&
