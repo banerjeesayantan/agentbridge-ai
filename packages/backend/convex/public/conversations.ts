@@ -4,6 +4,8 @@ import { ConvexError, v } from "convex/values";
 import { supportAgent } from "../system/ai/agents/supportAgent";
 import { MessageDoc, saveMessage } from "@convex-dev/agent";
 import { paginationOptsValidator } from "convex/server";
+import { RATE } from "../lib/limits";
+import { enforceRateLimit } from "../lib/rateLimit";
 
 export const getMany = query({
   args: {
@@ -120,6 +122,8 @@ export const create = mutation({
         message: "Invalid organization for this session",
       });
     }
+
+    await enforceRateLimit(ctx, `conversation:create:session:${args.contactSessionId}`, RATE.conversationCreateSession);
 
     // This refreshes the user's session if they are within the threshold
     await ctx.runMutation(internal.system.contactSessions.refresh, {
