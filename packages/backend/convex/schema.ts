@@ -51,6 +51,8 @@ export default defineSchema({
   }).index("by_org_request", ["organizationId", "requestId"]),
   widgetSettings: defineTable({
     organizationId: v.string(),
+    // Exact browser origins allowed to install this public widget.
+    allowedOrigins: v.optional(v.array(v.string())),
     greetMessage: v.string(),
     defaultSuggestions: v.object({
       suggestion1: v.optional(v.string()),
