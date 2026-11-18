@@ -60,10 +60,11 @@ const HIDE_ANIMATION_MS = 300;
     return new URL(EMBED_CONFIG.WIDGET_URL).origin;
   }
 
-  function buildWidgetUrl(orgId: string): string {
+  function buildWidgetUrl(orgId: string, token: string): string {
     const params = new URLSearchParams();
-    params.append('organizationId', orgId);
-    return `${EMBED_CONFIG.WIDGET_URL}?${params.toString()}`;
+    params.append("organizationId", orgId);
+    const fragment = new URLSearchParams({ installToken: token });
+    return `${EMBED_CONFIG.WIDGET_URL}?${params.toString()}#${fragment.toString()}`;
   }
 
   function isMounted(): boolean {
@@ -77,7 +78,7 @@ const HIDE_ANIMATION_MS = 300;
     showTimer = undefined;
   }
 
-  function render() {
+  async function render() {
     const orgId = organizationId!;
     const side = position === 'bottom-right' ? 'right: 20px;' : 'left: 20px;';
     const transition = reduceMotion ? 'none' : 'all 0.2s ease';
@@ -140,7 +141,14 @@ const HIDE_ANIMATION_MS = 300;
       `;
 
       nextIframe.title = 'Support chat';
-      nextIframe.src = buildWidgetUrl(orgId);
+      if (!EMBED_CONFIG.BOOTSTRAP_URL) throw new Error("VITE_WIDGET_BOOTSTRAP_URL is not configured.");
+      const bootstrapUrl = new URL(EMBED_CONFIG.BOOTSTRAP_URL);
+      bootstrapUrl.searchParams.set("organizationId", orgId);
+      const response = await fetch(bootstrapUrl.toString(), { method: "GET", mode: "cors", credentials: "omit", cache: "no-store" });
+      if (!response.ok) throw new Error(await response.text());
+      const authorization = await response.json() as { token?: string };
+      if (!authorization.token) throw new Error("Widget authorization response was invalid.");
+      nextIframe.src = buildWidgetUrl(orgId, authorization.token);
       nextIframe.style.cssText = `
         width: 100%;
         height: 100%;
