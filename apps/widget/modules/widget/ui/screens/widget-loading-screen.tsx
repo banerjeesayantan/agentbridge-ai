@@ -5,7 +5,7 @@ import { LoaderIcon } from "lucide-react";
 import { useAtomValue, useSetAtom } from "jotai";
 import { contactSessionIdAtomFamily, errorMessageAtom, installTokenAtom, loadingMessageAtom, organizationIdAtom, screenAtom, widgetSettingsAtom } from "@/modules/widget/atoms/widget-atoms";
 import { WidgetHeader } from "@/modules/widget/ui/components/widget-header";
-import { useMutation, useQuery } from "convex/react";
+import { useAction, useMutation } from "convex/react";
 import { api } from "@workspace/backend/_generated/api";
 
 type InitStep = "session" | "settings" | "done";
@@ -13,6 +13,7 @@ type InitStep = "session" | "settings" | "done";
 export const WidgetLoadingScreen = ({ organizationId, installToken }: { organizationId: string | null; installToken: string | null }) => {
   const [step, setStep] = useState<InitStep>("session");
   const [sessionValid, setSessionValid] = useState(false);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const contactSessionId = useAtomValue(contactSessionIdAtomFamily(organizationId || ""));
   const setInstallToken = useSetAtom(installTokenAtom);
   const setWidgetSettings = useSetAtom(widgetSettingsAtom);
@@ -22,10 +23,7 @@ export const WidgetLoadingScreen = ({ organizationId, installToken }: { organiza
   const setScreen = useSetAtom(screenAtom);
 
   const validateContactSession = useMutation(api.public.contactSessions.validate);
-  const widgetSettings = useQuery(
-    api.public.widgetSettings.getByOrganizationId,
-    organizationId && installToken ? { organizationId, installToken } : "skip",
-  );
+  const loadWidgetSettings = useAction(api.public.widgetSettings.getByOrganizationId);
 
   useEffect(() => {
     if (!organizationId) {
@@ -62,14 +60,23 @@ export const WidgetLoadingScreen = ({ organizationId, installToken }: { organiza
   }, [step, organizationId, installToken, contactSessionId, validateContactSession, setLoadingMessage]);
 
   useEffect(() => {
-    if (step !== "settings" || !installToken) return;
-    if (widgetSettings === undefined) {
-      setLoadingMessage("Loading secure widget settings...");
-      return;
-    }
-    setWidgetSettings(widgetSettings);
-    setStep("done");
-  }, [step, installToken, widgetSettings, setWidgetSettings, setLoadingMessage]);
+    if (step !== "settings" || !organizationId || !installToken || settingsLoaded) return;
+    let cancelled = false;
+    setLoadingMessage("Loading secure widget settings...");
+    void loadWidgetSettings({ organizationId, installToken })
+      .then((settings) => {
+        if (cancelled) return;
+        setWidgetSettings(settings);
+        setSettingsLoaded(true);
+        setStep("done");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setErrorMessage("This website is not authorized to use this widget. Check the allowed website origins in Widget Customization.");
+        setScreen("error");
+      });
+    return () => { cancelled = true; };
+  }, [step, organizationId, installToken, settingsLoaded, loadWidgetSettings, setWidgetSettings, setLoadingMessage, setErrorMessage, setScreen]);
 
   useEffect(() => {
     if (step === "done") setScreen(contactSessionId && sessionValid ? "selection" : "auth");
