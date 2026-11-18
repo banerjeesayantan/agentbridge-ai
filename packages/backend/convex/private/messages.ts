@@ -77,6 +77,7 @@ export const enhanceResponse = action({
         await ctx.runMutation(internal.system.usage.refund, {
           organizationId: orgId,
           requestId: args.requestId,
+          operationKey: `enhance-response:${args.prompt}`,
         });
       } catch (refundError) {
         console.error("Failed to refund AI message usage:", refundError);
