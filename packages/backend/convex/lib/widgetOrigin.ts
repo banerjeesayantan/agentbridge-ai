@@ -30,7 +30,7 @@ const encoder = new TextEncoder();
 function encode(bytes: Uint8Array): string {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\\+/g, "-").replace(/\\//g, "_").replace(/=+$/, "");
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 function decode(value: string): Uint8Array {
   const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
