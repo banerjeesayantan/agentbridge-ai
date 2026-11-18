@@ -96,8 +96,8 @@ http.route({
 
 async function validateRequest(
   req: Request,
+  payloadString: string,
 ): Promise<WebhookEvent | null> {
-  const payloadString = await req.text();
 
   const svixHeaders = {
     "svix-id": req.headers.get("svix-id") ?? "",
