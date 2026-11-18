@@ -13,13 +13,14 @@ import { WidgetContactScreen } from "../screens/widget-contact-screen";
 
 interface Props {
   organizationId: string | null;
+  installToken: string | null;
 };
 
-export const WidgetView = ({ organizationId }: Props) => {
+export const WidgetView = ({ organizationId, installToken }: Props) => {
   const screen = useAtomValue(screenAtom);
 
   const screenComponents = {
-    loading: <WidgetLoadingScreen organizationId={organizationId} />,
+    loading: <WidgetLoadingScreen organizationId={organizationId} installToken={installToken} />,
     error: <WidgetErrorScreen />,
     auth: <WidgetAuthScreen />,
     voice: <WidgetVoiceScreen />,

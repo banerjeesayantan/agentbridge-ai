@@ -1,9 +1,12 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "../_generated/server";
+import { requireRole } from "../lib/auth";
+import { normalizeAllowedOrigins } from "../lib/widgetOrigin";
 
 export const upsert = mutation({
   args: {
     greetMessage: v.string(),
+    allowedOrigins: v.array(v.string()),
     defaultSuggestions: v.object({
       suggestion1: v.optional(v.string()),
       suggestion2: v.optional(v.string()),
@@ -15,23 +18,8 @@ export const upsert = mutation({
     }),
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-            
-    if (identity === null) {
-      throw new ConvexError({
-        code: "UNAUTHORIZED",
-        message: "Identity not found",
-      });
-    }
-
-    const orgId = identity.orgId as string;
-
-    if (!orgId) {
-      throw new ConvexError({
-        code: "UNAUTHORIZED",
-        message: "Organization not found",
-      });
-    }
+    const { orgId } = await requireRole(ctx, "admin");
+    const allowedOrigins = normalizeAllowedOrigins(args.allowedOrigins);
 
     const existingWidgetSettings = await ctx.db
       .query("widgetSettings")
@@ -41,6 +29,7 @@ export const upsert = mutation({
     if (existingWidgetSettings) {
       await ctx.db.patch(existingWidgetSettings._id, {
         greetMessage: args.greetMessage,
+        allowedOrigins,
         defaultSuggestions: args.defaultSuggestions,
         vapiSettings: args.vapiSettings,
       });
@@ -48,6 +37,7 @@ export const upsert = mutation({
       await ctx.db.insert("widgetSettings", {
         organizationId: orgId,
         greetMessage: args.greetMessage,
+        allowedOrigins,
         defaultSuggestions: args.defaultSuggestions,
         vapiSettings: args.vapiSettings,
       });

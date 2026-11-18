@@ -1,18 +1,20 @@
-import { v } from "convex/values";
-import { query } from "../_generated/server";
+import { ConvexError, v } from "convex/values";
+import { internal } from "../_generated/api";
+import type { Doc } from "../_generated/dataModel";
+import { action } from "../_generated/server";
+import { assertOrgId } from "../lib/limits";
+import { verifyWidgetInstallToken } from "../lib/widgetOrigin";
 
-export const getByOrganizationId = query({
-  args: {
-    organizationId: v.string(),
-  },
-  handler: async (ctx, args) => {
-    const widgetSettings = await ctx.db
-      .query("widgetSettings")
-      .withIndex("by_organization_id", (q) => 
-        q.eq("organizationId", args.organizationId),
-      )
-      .unique();
-
-    return widgetSettings;
+export const getByOrganizationId = action({
+  args: { organizationId: v.string(), installToken: v.string() },
+  handler: async (ctx, args): Promise<Doc<"widgetSettings">> => {
+    const organizationId = assertOrgId(args.organizationId);
+    const claims = await verifyWidgetInstallToken(args.installToken, organizationId);
+    const settings: Doc<"widgetSettings"> | null = await ctx.runQuery(internal.system.widgetInstallations.getSettings, {
+      organizationId,
+      origin: claims.origin,
+    });
+    if (!settings) throw new ConvexError({ code: "UNAUTHORIZED", message: "Widget origin is no longer authorized." });
+    return settings;
   },
 });

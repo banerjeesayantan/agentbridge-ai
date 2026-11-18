@@ -7,6 +7,8 @@ import { escalateConversation } from "../system/ai/tools/escalateConversation";
 import { resolveConversation } from "../system/ai/tools/resolveConversation";
 import { saveMessage } from "@convex-dev/agent";
 import { search } from "../system/ai/tools/search";
+import { RATE, INPUT, assertText } from "../lib/limits";
+import { rateLimited } from "../lib/rateLimit";
 
 export const create = action({
   args: {
@@ -16,6 +18,8 @@ export const create = action({
     requestId: v.string(),
   },
   handler: async (ctx, args) => {
+    const prompt = assertText(args.prompt, INPUT.PROMPT_MAX, "prompt");
+    const requestId = assertText(args.requestId, 128, "requestId");
     const contactSession = await ctx.runQuery(
       internal.system.contactSessions.getOne,
       {
@@ -58,6 +62,14 @@ export const create = action({
       });
     }
 
+    for (const [key, config] of [
+      [`message:session:${args.contactSessionId}`, RATE.messageSession],
+      [`message:org:${contactSession.organizationId}`, RATE.messageOrg],
+    ] as const) {
+      const gate = await ctx.runMutation(internal.system.rateLimit.take, { key, ...config });
+      if (!gate.ok) rateLimited(gate.retryAfterMs);
+    }
+
     // This refreshes the user's session if they are within the threshold
     await ctx.runMutation(internal.system.contactSessions.refresh, {
       contactSessionId: args.contactSessionId,
@@ -68,13 +80,13 @@ export const create = action({
     if (conversation.status !== "unresolved") {
       await saveMessage(ctx, components.agent, {
         threadId: args.threadId,
-        prompt: args.prompt,
+        prompt,
       });
       return;
     }
 
     if (!process.env.GROQ_API_KEY) {
-      await saveMessage(ctx, components.agent, { threadId: args.threadId, prompt: args.prompt });
+      await saveMessage(ctx, components.agent, { threadId: args.threadId, prompt: prompt });
       await ctx.runMutation(internal.system.conversations.escalate, { threadId: args.threadId });
       throw new ConvexError({
         code: "SERVICE_UNAVAILABLE",
@@ -85,13 +97,16 @@ export const create = action({
     const usage = await ctx.runMutation(internal.system.usage.consume, {
       organizationId: conversation.organizationId,
       metric: "aiMessages",
-      requestId: args.requestId,
+      requestId,
+      operationKey: `widget-message:${args.threadId}:${prompt}`,
     });
+
+    if (usage.duplicate) return;
 
     if (!usage.allowed) {
       // Over the plan's allowance: keep the message and hand over to a human
       // instead of calling the model or dropping the customer.
-      await saveMessage(ctx, components.agent, { threadId: args.threadId, prompt: args.prompt });
+      await saveMessage(ctx, components.agent, { threadId: args.threadId, prompt: prompt });
       await ctx.runMutation(internal.system.conversations.escalate, { threadId: args.threadId });
       return;
     }
@@ -101,7 +116,7 @@ export const create = action({
         ctx,
         { threadId: args.threadId },
         {
-          prompt: args.prompt,
+          prompt: prompt,
           tools: {
             escalateConversationTool: escalateConversation,
             resolveConversationTool: resolveConversation,
@@ -113,7 +128,8 @@ export const create = action({
       try {
         await ctx.runMutation(internal.system.usage.refund, {
           organizationId: conversation.organizationId,
-          requestId: args.requestId,
+          requestId,
+          operationKey: `widget-message:${args.threadId}:${prompt}`,
         });
       } catch (refundError) {
         console.error("Failed to refund conversation AI usage:", refundError);

@@ -47,6 +47,15 @@ Clerk authentication and organization membership do not automatically implement 
 - Validate iframe message origin and source in the embed/widget communication path.
 - Do not expose provider credentials, Polar credentials, AWS credentials or internal function names to the browser.
 
+## Widget installation authorization
+
+- Each organization configures an explicit allowlist of website origins in Widget Customization. Enter exact origins (scheme + host + optional port), one per line; HTTPS is required outside localhost development.
+- The embed script requests `/widget/bootstrap?organizationId=...` from the Convex HTTP deployment. The server reads the browser-controlled `Origin` header, checks it against the stored allowlist, and returns a five-minute HMAC-signed installation token only with an exact-origin CORS response.
+- The token is placed in the iframe URL fragment (not sent in the HTTP request or Referer) and is verified server-side before widget settings are returned or a visitor session is created. Visitor sessions retain the verified installation origin.
+- Configure `WIDGET_INSTALLATION_SECRET` as a random secret of at least 32 characters in the Convex deployment environment. Configure `VITE_WIDGET_BOOTSTRAP_URL` in the embed build as the full Convex HTTP endpoint URL ending in `/widget/bootstrap` (the deployment's `.convex.site` origin).
+- Run `npx convex run system/organizations:backfill` once after deploying if existing Clerk organizations have not yet been mirrored. Organizations marked deleted are denied bootstrap.
+- Origin checks are browser-enforced CORS plus a short-lived bearer token, not proof against a non-browser client capable of forging HTTP headers. Do not treat this as protection against token theft, compromised customer websites, or server-side abuse; continue to rate-limit and monitor public endpoints.
+
 ## 5. Webhook and billing protections
 
 - Verify the provider signature against the raw request body.

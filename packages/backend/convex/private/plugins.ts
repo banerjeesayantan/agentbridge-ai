@@ -1,28 +1,13 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "../_generated/server";
+import { requireRole } from "../lib/auth";
 
 export const remove = mutation({
   args: {
     service: v.union(v.literal("vapi"))
   },
   handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    
-    if (identity === null) {
-      throw new ConvexError({
-        code: "UNAUTHORIZED",
-        message: "Identity not found",
-      });
-    }
-
-    const orgId = identity.orgId as string;
-
-    if (!orgId) {
-      throw new ConvexError({
-        code: "UNAUTHORIZED",
-        message: "Organization not found",
-      });
-    }
+    const { orgId } = await requireRole(ctx, "admin");
 
     const existingPlugin = await ctx.db
       .query("plugins")

@@ -41,6 +41,7 @@ export default defineSchema({
   usageEvents: defineTable({
     organizationId: v.string(),
     requestId: v.string(),
+    operationKey: v.optional(v.string()),
     metric: v.optional(v.literal("aiMessages")),
     units: v.optional(v.number()),
     // Absent on legacy rows, which behave as "committed".
@@ -50,6 +51,8 @@ export default defineSchema({
   }).index("by_org_request", ["organizationId", "requestId"]),
   widgetSettings: defineTable({
     organizationId: v.string(),
+    // Exact browser origins allowed to install this public widget.
+    allowedOrigins: v.optional(v.array(v.string())),
     greetMessage: v.string(),
     defaultSuggestions: v.object({
       suggestion1: v.optional(v.string()),
@@ -87,6 +90,7 @@ export default defineSchema({
     name: v.string(),
     email: v.string(),
     organizationId: v.string(),
+    installationOrigin: v.optional(v.string()),
     expiresAt: v.number(),
     metadata: v.optional(v.object({
       userAgent: v.optional(v.string()),

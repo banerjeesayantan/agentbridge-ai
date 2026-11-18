@@ -81,6 +81,7 @@ import type * as system_usage from "../system/usage.js";
 import type * as system_voiceBinding from "../system/voiceBinding.js";
 import type * as system_voiceTrials from "../system/voiceTrials.js";
 import type * as system_voiceWallet from "../system/voiceWallet.js";
+import type * as system_widgetInstallations from "../system/widgetInstallations.js";
 import type * as users from "../users.js";
 import type * as vapiWebhookHttp from "../vapiWebhookHttp.js";
 
@@ -172,6 +173,7 @@ declare const fullApi: ApiFromModules<{
   "system/voiceBinding": typeof system_voiceBinding;
   "system/voiceTrials": typeof system_voiceTrials;
   "system/voiceWallet": typeof system_voiceWallet;
+  "system/widgetInstallations": typeof system_widgetInstallations;
   users: typeof users;
   vapiWebhookHttp: typeof vapiWebhookHttp;
 }>;

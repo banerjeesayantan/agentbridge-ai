@@ -1,16 +1,12 @@
 
-import { createClerkClient } from "@clerk/backend";
 import { ConvexError, v } from "convex/values";
 import { internal } from "../_generated/api";
 import { action, mutation } from "../_generated/server";
 import { isContactSessionActive } from "../lib/contactSessionPolicy";
+import { RATE, INPUT, assertText, assertEmail, assertOrgId } from "../lib/limits";
+import { verifyWidgetInstallToken } from "../lib/widgetOrigin";
+import { rateLimited } from "../lib/rateLimit";
 import type { Id } from "../_generated/dataModel";
-
-const clerkSecretKey = process.env.CLERK_SECRET_KEY;
-
-const clerkClient = createClerkClient({
-  secretKey: clerkSecretKey || "",
-});
 
 const metadataValidator = v.optional(
   v.object({
@@ -30,38 +26,35 @@ const metadataValidator = v.optional(
 );
 
 /**
- * Verify the organization with Clerk before creating a visitor session.
- * The database write is restricted to the internal mutation.
+ * Verify the signed installation token and current origin allowlist before
+ * creating a visitor session. The database write stays internal.
  */
 export const create = action({
   args: {
     name: v.string(),
     email: v.string(),
     organizationId: v.string(),
+    installToken: v.string(),
     metadata: metadataValidator,
   },
   handler: async (ctx, args): Promise<Id<"contactSessions">> => {
-    if (!clerkSecretKey) {
-      throw new ConvexError({
-        code: "SERVICE_UNAVAILABLE",
-        message: "Organization verification is not configured.",
-      });
-    }
-
-    try {
-      await clerkClient.organizations.getOrganization({
-        organizationId: args.organizationId,
-      });
-    } catch {
-      throw new ConvexError({
-        code: "BAD_REQUEST",
-        message: "Invalid organization.",
-      });
+    const name = assertText(args.name, INPUT.NAME_MAX, "name");
+    const email = assertEmail(args.email);
+    const organizationId = assertOrgId(args.organizationId);
+    const gate = await ctx.runMutation(internal.system.rateLimit.take, {
+      key: `session:create:org:${organizationId}`,
+      ...RATE.sessionCreateOrg,
+    });
+    if (!gate.ok) rateLimited(gate.retryAfterMs);
+    const claims = await verifyWidgetInstallToken(args.installToken, organizationId);
+    const installation = await ctx.runQuery(internal.system.widgetInstallations.getConfig, { organizationId });
+    if (!installation || !installation.allowedOrigins.includes(claims.origin)) {
+      throw new ConvexError({ code: "UNAUTHORIZED", message: "This website is not authorized to use this widget." });
     }
 
     return await ctx.runMutation(
       internal.system.contactSessions.create,
-      args,
+      { name, email, organizationId, installationOrigin: claims.origin, metadata: args.metadata },
     );
   },
 });
@@ -72,6 +65,7 @@ export const create = action({
 export const validate = mutation({
   args: {
     contactSessionId: v.id("contactSessions"),
+    installToken: v.string(),
   },
   handler: async (ctx, args): Promise<{ valid: boolean }> => {
     const contactSession = await ctx.db.get(args.contactSessionId);
@@ -82,6 +76,15 @@ export const validate = mutation({
     ) {
       return { valid: false };
     }
+
+    const claims = await verifyWidgetInstallToken(args.installToken, contactSession.organizationId);
+    const organization = await ctx.db.query("organizations")
+      .withIndex("by_clerk_org_id", (q) => q.eq("clerkOrgId", contactSession.organizationId))
+      .first();
+    const settings = await ctx.db.query("widgetSettings")
+      .withIndex("by_organization_id", (q) => q.eq("organizationId", contactSession.organizationId))
+      .unique();
+    if (organization?.status !== "active" || !contactSession.installationOrigin || claims.origin !== contactSession.installationOrigin || !(settings?.allowedOrigins ?? []).includes(claims.origin)) return { valid: false };
 
     return { valid: true };
   },

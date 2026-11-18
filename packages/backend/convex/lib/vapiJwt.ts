@@ -2,15 +2,13 @@
  * Signs the short-lived, restricted PUBLIC token the browser uses to start one
  * Vapi web call. The private key never leaves the server.
  *
- * What Vapi documents: a public-scope JWT signed with the organization's
- * private key, carrying `orgId` and `token.restrictions` (allowedOrigins,
- * allowedAssistantIds, allowTransientAssistant).
+ * Vapi documents HS256 signing with the organization private API key and
+ * public-token restrictions for allowed origins and assistant IDs. A real
+ * sandbox call is still required to verify the configured credentials and
+ * effective assistant behavior in this deployment.
  *
- * What Vapi does NOT document (so nothing here relies on it):
- *  - the signing algorithm: HS256 is assumed (the common default). It MUST be
- *    confirmed against a real Vapi sandbox before production use;
- *  - single use: a token is treated as REUSABLE until it expires;
- *  - whether assistant overrides sent by the browser are blocked.
+ * Vapi does not document single-use tokens: treat each token as reusable until
+ * expiry. Do not rely on assistant overrides being blocked by the token.
  */
 
 export interface VapiPublicTokenInput {
