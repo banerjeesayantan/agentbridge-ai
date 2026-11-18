@@ -31,17 +31,17 @@ http.route({
     } catch {
       return new Response("Invalid origin", { status: 403, headers: { "Cache-Control": "no-store" } });
     }
-    const gate = await ctx.runMutation(internal.system.rateLimit.take, {
-      key: `widget-bootstrap:${organizationId}`,
-      capacity: 30,
-      refillPerSecond: 0.5,
-    });
-    if (!gate.ok) return new Response("Too many requests", { status: 429, headers: { "Cache-Control": "no-store", "Retry-After": String(Math.max(1, Math.ceil(gate.retryAfterMs / 1000))) } });
-
     const config = await ctx.runQuery(internal.system.widgetInstallations.getConfig, { organizationId });
     if (!config || !config.allowedOrigins.includes(origin)) {
       return new Response("This website is not authorized to use this widget", { status: 403, headers: { "Cache-Control": "no-store" } });
     }
+
+    const gate = await ctx.runMutation(internal.system.rateLimit.take, {
+      key: `widget-bootstrap:${organizationId}:${origin}`,
+      capacity: 30,
+      refillPerSecond: 0.5,
+    });
+    if (!gate.ok) return new Response("Too many requests", { status: 429, headers: { "Cache-Control": "no-store", "Retry-After": String(Math.max(1, Math.ceil(gate.retryAfterMs / 1000))) } });
 
     const issuedAt = Date.now();
     let token: string;
