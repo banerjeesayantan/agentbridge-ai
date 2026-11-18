@@ -18,7 +18,7 @@ export const create = action({
     requestId: v.string(),
   },
   handler: async (ctx, args) => {
-    const prompt = assertText(args.prompt, INPUT.PROMPT_MAX, "prompt");
+    const prompt = assertText(prompt, INPUT.PROMPT_MAX, "prompt");
     const requestId = assertText(args.requestId, 128, "requestId");
     const contactSession = await ctx.runQuery(
       internal.system.contactSessions.getOne,
@@ -86,7 +86,7 @@ export const create = action({
     }
 
     if (!process.env.GROQ_API_KEY) {
-      await saveMessage(ctx, components.agent, { threadId: args.threadId, prompt: args.prompt });
+      await saveMessage(ctx, components.agent, { threadId: args.threadId, prompt: prompt });
       await ctx.runMutation(internal.system.conversations.escalate, { threadId: args.threadId });
       throw new ConvexError({
         code: "SERVICE_UNAVAILABLE",
@@ -106,7 +106,7 @@ export const create = action({
     if (!usage.allowed) {
       // Over the plan's allowance: keep the message and hand over to a human
       // instead of calling the model or dropping the customer.
-      await saveMessage(ctx, components.agent, { threadId: args.threadId, prompt: args.prompt });
+      await saveMessage(ctx, components.agent, { threadId: args.threadId, prompt: prompt });
       await ctx.runMutation(internal.system.conversations.escalate, { threadId: args.threadId });
       return;
     }
@@ -116,7 +116,7 @@ export const create = action({
         ctx,
         { threadId: args.threadId },
         {
-          prompt: args.prompt,
+          prompt: prompt,
           tools: {
             escalateConversationTool: escalateConversation,
             resolveConversationTool: resolveConversation,
