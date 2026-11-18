@@ -72,9 +72,9 @@ export const vapiWebhook = httpAction(async (ctx, request) => {
     return json(401, { error: "unauthorized" });
   }
 
-  const raw = await request.text();
+  const raw = await readLimitedBody(request);
 
-  if (raw.length > MAX_BODY_CHARS) {
+  if (raw === null) {
     return json(413, { error: "payload too large" });
   }
 
