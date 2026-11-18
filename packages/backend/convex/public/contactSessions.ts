@@ -52,7 +52,7 @@ export const create = action({
     });
     if (!gate.ok) rateLimited(gate.retryAfterMs);
     const globalGate = await ctx.runMutation(internal.system.rateLimit.take, {
-      key: "session:create:clerk:global",
+      key: "clerk:lookups:global",
       ...RATE.clerkLookupGlobal,
     });
     if (!globalGate.ok) rateLimited(globalGate.retryAfterMs);
