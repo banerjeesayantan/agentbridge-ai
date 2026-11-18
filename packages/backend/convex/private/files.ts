@@ -102,6 +102,7 @@ export const addFile = action({
           organizationId: orgId,
           metric: "aiMessages",
           requestId,
+          operationKey: `file-ingestion:${requestId}`,
         });
         if (!usage.allowed) {
           throw new ConvexError(limitError("AI message", usage.used, usage.limit, usage.resetsAt));
@@ -153,10 +154,11 @@ export const addFile = action({
       return { entryId };
     } catch (error) {
       if (!committed && storageId) await ctx.storage.delete(storageId).catch(() => {});
-            if (!committed && charged) {
+      if (!committed && charged) {
         await ctx.runMutation(internal.system.usage.refund, {
           organizationId: orgId,
           requestId,
+          operationKey: `file-ingestion:${requestId}`,
         });
       }
       if (error instanceof ConvexError) throw error;
