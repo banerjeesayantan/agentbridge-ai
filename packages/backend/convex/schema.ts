@@ -41,6 +41,7 @@ export default defineSchema({
   usageEvents: defineTable({
     organizationId: v.string(),
     requestId: v.string(),
+    operationKey: v.optional(v.string()),
     metric: v.optional(v.literal("aiMessages")),
     units: v.optional(v.number()),
     // Absent on legacy rows, which behave as "committed".
