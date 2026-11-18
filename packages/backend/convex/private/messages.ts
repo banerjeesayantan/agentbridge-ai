@@ -44,7 +44,12 @@ export const enhanceResponse = action({
       organizationId: orgId,
       metric: "aiMessages",
       requestId: args.requestId,
+      operationKey: `enhance-response:${args.prompt}`,
     });
+
+    if (usage.duplicate) {
+      throw new ConvexError({ code: "ALREADY_PROCESSED", message: "This enhancement request has already been processed." });
+    }
 
     if (!usage.allowed) {
       throw new ConvexError(
