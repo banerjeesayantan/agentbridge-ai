@@ -28,6 +28,7 @@ export const create = internalMutation({
     name: v.string(),
     email: v.string(),
     organizationId: v.string(),
+    installationOrigin: v.string(),
     metadata: metadataValidator,
   },
   handler: async (ctx, args) => {
@@ -40,6 +41,7 @@ export const create = internalMutation({
       name,
       email,
       organizationId: args.organizationId,
+      installationOrigin: args.installationOrigin,
       expiresAt,
       metadata: args.metadata,
     });
