@@ -1,5 +1,5 @@
 import { createClerkClient } from "@clerk/backend";
-import { ConvexError, v } from "convex/values";
+import { v } from "convex/values";
 import { internal } from "../_generated/api";
 import { action } from "../_generated/server";
 import { RATE, assertOrgId } from "../lib/limits";
@@ -20,14 +20,11 @@ export const validate = action({
       ...RATE.clerkLookupGlobal,
     });
     if (!gate.ok) rateLimited(gate.retryAfterMs);
-    let organization;
     try {
-      organization = await clerkClient.organizations.getOrganization({
-      organizationId,
-      });
+      await clerkClient.organizations.getOrganization({ organizationId });
+      return { valid: true };
     } catch {
       return { valid: false, reason: "Organization not valid" };
     }
-    return organization ? { valid: true } : { valid: false, reason: "Organization not valid" };
   },
 });
