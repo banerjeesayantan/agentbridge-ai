@@ -90,6 +90,7 @@ export default defineSchema({
     name: v.string(),
     email: v.string(),
     organizationId: v.string(),
+    installationOrigin: v.optional(v.string()),
     expiresAt: v.number(),
     metadata: v.optional(v.object({
       userAgent: v.optional(v.string()),
