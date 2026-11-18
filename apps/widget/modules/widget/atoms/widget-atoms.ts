@@ -6,6 +6,7 @@ import { Doc, Id } from "@workspace/backend/_generated/dataModel";
 
 export const screenAtom = atom<WidgetScreen>("loading");
 export const organizationIdAtom = atom<string | null>(null);
+export const installTokenAtom = atom<string | null>(null);
 export const contactSessionIdAtomFamily = atomFamily((organizationId: string) => {
   return atomWithStorage<Id<"contactSessions"> | null>(`${CONTACT_SESSION_KEY}_${organizationId}`, null)
 });
