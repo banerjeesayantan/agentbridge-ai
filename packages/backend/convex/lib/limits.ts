@@ -32,7 +32,7 @@ export const RATE = {
   /** Voice authorizations per visitor session (3 per 10 minutes). */
   voiceSession: { capacity: 3, refillPerSecond: 3 / 600 },
   /** Verified Clerk organization lookups across the whole deployment. */
-  clerkLookupGlobal: { capacity: 30, refillPerSecond: 0.5 },
+  clerkLookupGlobal: { capacity: 300, refillPerSecond: 5 },
   /** Call-started reports per session. */
   voiceReportSession: { capacity: 10, refillPerSecond: 0.1 },
 } satisfies Record<string, RateConfig>;
