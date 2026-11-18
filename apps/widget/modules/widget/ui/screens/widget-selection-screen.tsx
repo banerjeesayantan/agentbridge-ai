@@ -4,7 +4,7 @@ import { WidgetHeader } from "@/modules/widget/ui/components/widget-header";
 import { Button } from "@workspace/ui/components/button";
 import { useAtomValue, useSetAtom } from "jotai";
 import { ChevronRightIcon, MessageSquareTextIcon, MicIcon, PhoneIcon } from "lucide-react";
-import { contactSessionIdAtomFamily, conversationIdAtom, errorMessageAtom, hasVapiSecretsAtom, organizationIdAtom, screenAtom, widgetSettingsAtom } from "../../atoms/widget-atoms";
+import { contactSessionIdAtomFamily, conversationIdAtom, errorMessageAtom, organizationIdAtom, screenAtom, widgetSettingsAtom } from "../../atoms/widget-atoms";
 import { useMutation } from "convex/react";
 import { api } from "@workspace/backend/_generated/api";
 import { useState } from "react";
@@ -16,7 +16,6 @@ export const WidgetSelectionScreen = () => {
   const setConversationId = useSetAtom(conversationIdAtom);
 
   const widgetSettings = useAtomValue(widgetSettingsAtom);
-  const hasVapiSecrets = useAtomValue(hasVapiSecretsAtom);
   const organizationId = useAtomValue(organizationIdAtom);
   const contactSessionId = useAtomValue(
     contactSessionIdAtomFamily(organizationId || "")
@@ -78,7 +77,7 @@ export const WidgetSelectionScreen = () => {
           </div>
           <ChevronRightIcon />
         </Button>
-        {hasVapiSecrets && widgetSettings?.vapiSettings?.assistantId && (
+        {widgetSettings?.vapiSettings?.assistantId && (
           <Button
             className="h-16 w-full justify-between"
             variant="outline"
@@ -92,7 +91,7 @@ export const WidgetSelectionScreen = () => {
             <ChevronRightIcon />
           </Button>
         )}
-        {hasVapiSecrets && widgetSettings?.vapiSettings?.phoneNumber && (
+        {widgetSettings?.vapiSettings?.phoneNumber && (
           <Button
             className="h-16 w-full justify-between"
             variant="outline"
