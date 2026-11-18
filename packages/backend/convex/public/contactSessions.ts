@@ -78,7 +78,10 @@ export const validate = mutation({
     }
 
     const claims = await verifyWidgetInstallToken(args.installToken, contactSession.organizationId);
-    if (!contactSession.installationOrigin || claims.origin !== contactSession.installationOrigin) return { valid: false };
+    const settings = await ctx.db.query("widgetSettings")
+      .withIndex("by_organization_id", (q) => q.eq("organizationId", contactSession.organizationId))
+      .unique();
+    if (!contactSession.installationOrigin || claims.origin !== contactSession.installationOrigin || !(settings?.allowedOrigins ?? []).includes(claims.origin)) return { valid: false };
 
     return { valid: true };
   },
