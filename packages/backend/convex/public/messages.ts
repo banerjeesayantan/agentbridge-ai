@@ -98,7 +98,10 @@ export const create = action({
       organizationId: conversation.organizationId,
       metric: "aiMessages",
       requestId,
+      operationKey: `widget-message:${args.threadId}:${prompt}`,
     });
+
+    if (usage.duplicate) return;
 
     if (!usage.allowed) {
       // Over the plan's allowance: keep the message and hand over to a human
