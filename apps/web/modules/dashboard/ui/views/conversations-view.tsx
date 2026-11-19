@@ -98,7 +98,7 @@ export const ConversationsView = () => {
   } = usePaginatedQuery(
     api.private.conversations.getMany,
     { status: statusFilter },
-    { initialNumItems: 20 },
+    { initialNumItems: 10 },
   );
 
   const isLoading = status === "LoadingFirstPage";
