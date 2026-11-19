@@ -18,16 +18,13 @@ import {
 import { Separator } from "@workspace/ui/components/separator";
 import { SidebarTrigger } from "@workspace/ui/components/sidebar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs";
-import { ToggleGroup, ToggleGroupItem } from "@workspace/ui/components/toggle-group";
 import { cn } from "@workspace/ui/lib/utils";
 import {
   AlertTriangleIcon,
   EyeIcon,
   EyeOffIcon,
-  MonitorIcon,
   PlayIcon,
   RefreshCwIcon,
-  SmartphoneIcon,
   Trash2Icon,
 } from "lucide-react";
 import Link from "next/link";
@@ -82,7 +79,6 @@ export const PlaygroundView = () => {
   const orgId = organization?.id ?? "";
 
   const [position, setPosition] = useState<WidgetPosition>("bottom-right");
-  const [device, setDevice] = useState<"desktop" | "mobile">("desktop");
   const [framework, setFramework] = useState<IntegrationId>("html");
 
   const preview = useWidgetPreview();
@@ -124,7 +120,7 @@ export const PlaygroundView = () => {
   const snippet = createScript(framework, orgId || "YOUR_ORGANIZATION_ID", position);
 
   return (
-    <div className="flex min-h-svh w-full min-w-0 max-w-full flex-col overflow-x-hidden bg-muted xl:h-svh xl:overflow-hidden">
+    <div className="flex h-full min-h-0 w-full min-w-0 max-w-full flex-col overflow-hidden bg-muted">
       <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-b bg-background px-3 py-2 sm:px-4">
         <SidebarTrigger aria-label="Toggle sidebar" />
         <Separator className="h-5" orientation="vertical" />
@@ -135,7 +131,7 @@ export const PlaygroundView = () => {
         </div>
       </header>
 
-      <div className="grid w-full min-w-0 flex-1 grid-cols-1 gap-3 p-2 sm:gap-4 sm:p-4 xl:min-h-0 xl:grid-cols-[minmax(0,1fr)_minmax(320px,380px)]">
+      <div className="grid min-h-0 w-full min-w-0 flex-1 grid-cols-1 gap-3 overflow-y-auto p-2 sm:gap-3 sm:p-3 xl:grid-cols-[minmax(0,1fr)_minmax(300px,340px)] xl:overflow-hidden">
         {/* Preview canvas */}
         <Card className="flex min-h-[400px] min-w-0 max-w-full flex-col gap-0 overflow-hidden py-0 sm:min-h-[460px] xl:min-h-0">
           <CardHeader className="flex flex-col items-stretch gap-3 border-b px-3 py-3 sm:flex-row sm:items-center sm:px-4">
@@ -157,21 +153,6 @@ export const PlaygroundView = () => {
                 Destroy
               </Button>
             </div>
-            <ToggleGroup
-              aria-label="Preview size"
-              className="ml-0 shrink-0 self-start sm:ml-auto sm:self-auto"
-              onValueChange={(value) => value && setDevice(value as "desktop" | "mobile")}
-              type="single"
-              value={device}
-              variant="outline"
-            >
-              <ToggleGroupItem aria-label="Desktop preview" value="desktop">
-                <MonitorIcon className="size-4" />
-              </ToggleGroupItem>
-              <ToggleGroupItem aria-label="Mobile preview" value="mobile">
-                <SmartphoneIcon className="size-4" />
-              </ToggleGroupItem>
-            </ToggleGroup>
           </CardHeader>
 
           {(toolbarHint || bundleStatus === "error" || bundleStatus === "missing-api") && (
@@ -199,15 +180,10 @@ export const PlaygroundView = () => {
             </div>
           )}
 
-          <CardContent className="flex min-h-[300px] min-w-0 flex-1 items-stretch justify-center overflow-hidden p-2 sm:min-h-[360px] sm:p-4 xl:min-h-0">
-            <div
-              className={cn(
-                "w-full overflow-hidden border bg-white shadow-sm transition-[max-width] duration-200",
-                device === "mobile" ? "max-w-[375px] rounded-[1.75rem] border-4 border-foreground/80" : "rounded-lg",
-              )}
-            >
+          <CardContent className="flex min-h-0 min-w-0 flex-1 items-stretch justify-center overflow-hidden p-2 sm:p-3">
+            <div className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden rounded-lg border bg-white shadow-sm">
               <iframe
-                className="size-full min-h-0 bg-white"
+                className="min-h-0 w-full flex-1 bg-white"
                 key={preview.frameKey}
                 onLoad={preview.handleFrameLoad}
                 ref={preview.iframeRef}
@@ -339,7 +315,7 @@ export const PlaygroundView = () => {
                 </div>
               </TabsContent>
 
-              <TabsContent className="space-y-5 p-4" value="diagnostics">
+              <TabsContent className="space-y-4 p-3 sm:p-4" value="diagnostics">
                 <Card className="gap-0 py-0">
                   <CardHeader className="px-4 py-3">
                     <CardTitle className="text-sm">Status</CardTitle>
@@ -382,7 +358,7 @@ export const PlaygroundView = () => {
                   </div>
                   <ol
                     aria-label="Widget event log"
-                    className="max-h-80 space-y-1.5 overflow-y-auto rounded-md border bg-background p-3 font-mono text-xs"
+                    className="max-h-[min(40vh,20rem)] min-h-24 space-y-1.5 overflow-y-auto rounded-md border bg-background p-3 font-mono text-xs"
                     role="log"
                   >
                     {preview.logs.length === 0 ? (
