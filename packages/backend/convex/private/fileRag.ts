@@ -59,24 +59,31 @@ export const getOwnedStorageId = internalQuery({
 
     if (!namespace) return null;
 
-    let cursor: string | null = null;
-    let isDone = false;
+    // Download links must work for an owned file throughout ingestion,
+    // including the pending state before embeddings finish.
     let found = false;
 
-    while (!isDone) {
-      const result = await rag.list(ctx, {
-        namespaceId: namespace.namespaceId,
-        paginationOpts: { cursor, numItems: 100 },
-        status: "ready",
-      });
+    for (const status of ["pending", "ready", "replaced"] as const) {
+      let cursor: string | null = null;
+      let isDone = false;
 
-      if (result.page.some((item) => item.entryId === args.entryId)) {
-        found = true;
-        break;
+      while (!isDone) {
+        const result = await rag.list(ctx, {
+          namespaceId: namespace.namespaceId,
+          paginationOpts: { cursor, numItems: 100 },
+          status,
+        });
+
+        if (result.page.some((item) => item.entryId === args.entryId)) {
+          found = true;
+          break;
+        }
+
+        cursor = result.continueCursor;
+        isDone = result.isDone;
       }
 
-      cursor = result.continueCursor;
-      isDone = result.isDone;
+      if (found) break;
     }
 
     if (!found) return null;
