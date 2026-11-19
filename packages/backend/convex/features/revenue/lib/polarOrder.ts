@@ -71,7 +71,16 @@ export function parsePolarOrderEvent(type: string, data: unknown, now: number): 
 
   const net = cents(data.net_amount ?? data.netAmount);
   if (net === undefined) return { kind: "invalid", reason: "invalid net amount" };
-  const refunded = cents(data.refunded_amount ?? data.refundedAmount) ?? 0;
+
+  const rawRefunded = data.refunded_amount ?? data.refundedAmount;
+  const refunded = cents(rawRefunded);
+  // A refund event without its cumulative refunded amount cannot be safely
+  // accounted for. Treating it as zero would acknowledge and permanently
+  // lose a real refund because Polar will not necessarily resend a richer body.
+  if (type === "order.refunded" && refunded === undefined) {
+    return { kind: "invalid", reason: "invalid refunded amount" };
+  }
+
   const fee = cents(data.platform_fee_amount ?? data.platformFeeAmount);
 
   const stamp = Date.parse(String(data.modified_at ?? data.modifiedAt ?? data.created_at ?? data.createdAt ?? ""));
@@ -82,7 +91,7 @@ export function parsePolarOrderEvent(type: string, data: unknown, now: number): 
       organizationId: external,
       type,
       netMicro: net * CENTS_TO_MICRO,
-      refundedTotalMicro: refunded * CENTS_TO_MICRO,
+      refundedTotalMicro: (refunded ?? 0) * CENTS_TO_MICRO,
       feeMicro: fee === undefined ? undefined : fee * CENTS_TO_MICRO,
       currency: "usd",
       occurredAt: Number.isFinite(stamp) ? stamp : now,
