@@ -10,8 +10,11 @@ export function DesktopOnlyGate({ children }: { children: ReactNode }) {
     const root = document.documentElement;
     const isPhone = MOBILE_DEVICE_PATTERN.test(navigator.userAgent);
     root.classList.toggle("is-mobile-device", isPhone);
+    root.classList.add("device-detection-complete");
 
-    return () => root.classList.remove("is-mobile-device");
+    return () => {
+      root.classList.remove("is-mobile-device", "device-detection-complete");
+    };
   }, []);
 
   return (
