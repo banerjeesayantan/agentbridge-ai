@@ -321,6 +321,9 @@ importers:
       '@dicebear/core':
         specifier: ^9.4.3
         version: 9.4.3
+      '@dicebear/glass':
+        specifier: ^9.2.3
+        version: 9.2.3(@dicebear/core@9.4.3)
       '@hookform/resolvers':
         specifier: ^5.2.0
         version: 5.2.0(react-hook-form@7.61.1(react@19.0.0))

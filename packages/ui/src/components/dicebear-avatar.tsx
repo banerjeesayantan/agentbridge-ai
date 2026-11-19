@@ -1,6 +1,6 @@
 "use client";
 
-import { glass } from "@dicebear/collection";
+import * as glass from "@dicebear/glass";
 import { createAvatar } from "@dicebear/core";
 import { useMemo } from "react";
 import { Avatar, AvatarImage } from "@workspace/ui/components/avatar";
