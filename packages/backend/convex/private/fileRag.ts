@@ -1,7 +1,7 @@
 
 import { v } from "convex/values";
 import { vEntryId } from "@convex-dev/rag";
-import { internalMutation, internalQuery } from "../_generated/server";
+import { internalAction, internalQuery } from "../_generated/server";
 import rag from "../system/ai/rag";
 import { Id } from "../_generated/dataModel";
 
@@ -12,7 +12,7 @@ type EntryMetadata = {
   category: string | null;
 };
 
-export const addRagEntry = internalMutation({
+export const addRagEntry = internalAction({
   args: {
     organizationId: v.string(),
     text: v.string(),
