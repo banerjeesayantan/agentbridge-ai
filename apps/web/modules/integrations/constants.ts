@@ -28,7 +28,7 @@ export type IntegrationId = (typeof INTEGRATIONS)[number]["id"];
 // previously hard-coded deployment so existing snippets do not change.
 export const EMBED_SCRIPT_URL =
   process.env.NEXT_PUBLIC_EMBED_SCRIPT_URL ||
-  "https://next15-echo-widget.vercel.app/widget.js";
+  "https://agentbridge-ai-seven.vercel.app/widget.js";
 
 export const HTML_SCRIPT = `<script
   src="{{SCRIPT_URL}}"
