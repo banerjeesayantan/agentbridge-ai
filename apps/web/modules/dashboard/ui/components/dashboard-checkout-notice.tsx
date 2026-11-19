@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@workspace/ui/components/alert";
-import { SparklesIcon } from "lucide-react";
-import Link from "next/link";
 import { Button } from "@workspace/ui/components/button";
+import { SparklesIcon, XIcon } from "lucide-react";
+import Link from "next/link";
 
 export function DashboardCheckoutNotice() {
   const [status, setStatus] = useState<"success" | "cancelled" | null>(null);
@@ -31,8 +31,23 @@ export function DashboardCheckoutNotice() {
 
   if (!status) return null;
 
+  const dismissButton = (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      className="absolute right-2 top-2 size-8"
+      aria-label="Dismiss checkout notification"
+      title="Dismiss"
+      onClick={() => setStatus(null)}
+    >
+      <XIcon className="size-4" />
+    </Button>
+  );
+
   return status === "success" ? (
-    <Alert className="mx-4 mt-4">
+    <Alert className="relative mx-4 mt-4 pr-12">
+      {dismissButton}
       <SparklesIcon className="size-4" />
       <AlertTitle>Checkout completed — confirming your subscription</AlertTitle>
       <AlertDescription>
@@ -42,7 +57,8 @@ export function DashboardCheckoutNotice() {
       <Button asChild className="mt-3"><Link href="/">Return to Dashboard</Link></Button>
     </Alert>
   ) : (
-    <Alert className="mx-4 mt-4">
+    <Alert className="relative mx-4 mt-4 pr-12">
+      {dismissButton}
       <AlertTitle>Checkout cancelled</AlertTitle>
       <AlertDescription>
         No new subscription was activated. Your current plan is unchanged, and
