@@ -3,23 +3,15 @@
 import { useEffect, type ReactNode } from "react";
 
 const MOBILE_DEVICE_PATTERN =
-  /Android.*Mobile|iPhone|iPod|Windows Phone|IEMobile|BlackBerry|Opera Mini/i;
+  /iPhone|iPod|Android.*Mobile|Windows Phone|IEMobile|BlackBerry|Opera Mini/i;
 
 export function DesktopOnlyGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     const root = document.documentElement;
-    const media = window.matchMedia("(max-width: 767px)");
-    const update = () => {
-      const isPhone = MOBILE_DEVICE_PATTERN.test(navigator.userAgent);
-      root.classList.toggle("is-mobile-device", isPhone || media.matches);
-    };
+    const isPhone = MOBILE_DEVICE_PATTERN.test(navigator.userAgent);
+    root.classList.toggle("is-mobile-device", isPhone);
 
-    update();
-    media.addEventListener("change", update);
-    return () => {
-      media.removeEventListener("change", update);
-      root.classList.remove("is-mobile-device");
-    };
+    return () => root.classList.remove("is-mobile-device");
   }, []);
 
   return (
