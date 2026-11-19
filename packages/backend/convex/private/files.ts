@@ -169,7 +169,7 @@ export const addFile = action({
         entryId: EntryId;
         created: boolean;
         oldStorageId: Id<"_storage"> | null;
-      } = await ctx.runMutation(internal.private.fileRag.addRagEntry, {
+      } = await ctx.runAction(internal.private.fileRag.addRagEntry, {
         organizationId: orgId,
         text,
         filename: check.filename,
