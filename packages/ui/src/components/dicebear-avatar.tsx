@@ -1,6 +1,6 @@
 "use client";
 
-import { create as glass } from "@dicebear/glass";
+import * as glass from "@dicebear/glass";
 import { createAvatar } from "@dicebear/core";
 import { useMemo } from "react";
 import { Avatar, AvatarImage } from "@workspace/ui/components/avatar";
@@ -28,7 +28,7 @@ export const DicebearAvatar = ({
       return imageUrl;
     }
 
-    const avatar = createAvatar(glass({}), {
+    const avatar = createAvatar(glass, {
       seed: seed.toLowerCase().trim(),
       size,
     });
