@@ -250,7 +250,12 @@ describe("customer voice summary is scoped to the caller's organization", () => 
     expect(a).toMatchObject({ plan: "pro", status: "available", budgetMicro: 14_750_000, spentMicro: 1_500_000, reservedMicro: 0, remainingMicro: 13_250_000 });
     expect(a.recentCalls).toEqual([{ endedAtMs: expect.any(Number), durationSeconds: 75, chargeMicro: 1_500_000, costStatus: "known" }]);
     const keys = JSON.stringify(a);
-    for (const leaked of ["balance", "revenue", "asst_", "org_B", "9000000", "123"]) expect(keys).not.toContain(leaked);
+    for (const leaked of ["balance", "revenue", "asst_", "org_B", "9000000"]) {
+      expect(keys).not.toContain(leaked);
+    }
+    // Provider account balance is never part of an organization summary.
+    expect(a).not.toHaveProperty("balanceMicro");
+    expect(a).not.toHaveProperty("providerBalance");
 
     const b = await t.withIdentity({ subject: "user_y", orgId: "org_B" }).query(api.features.voice.private.voiceBilling.summary, {});
     expect(b).toMatchObject({ plan: "enterprise", spentMicro: 9_000_000 });
