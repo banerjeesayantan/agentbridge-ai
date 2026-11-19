@@ -6,7 +6,7 @@ import { isPlatformAdmin, platformAdminIds } from "../../../lib/platformAdmin.ts
 import { parsePolarOrderEvent } from "../../revenue/lib/polarOrder.ts";
 import { signVapiPublicToken } from "../lib/vapiJwt.ts";
 import { extractBearerToken, parseVapiMessage, secretsMatch, successEndedReasons } from "../lib/vapiWebhook.ts";
-import { holdDeadline, parseOrigins, readVoiceBudgetConfig } from "../lib/voiceBudget.ts";
+import { allowedOriginsAreSecure, holdDeadline, parseOrigins, readVoiceBudgetConfig } from "../lib/voiceBudget.ts";
 
 let n = 0;
 const t = async (name: string, f: () => void | Promise<void>) => {
@@ -101,6 +101,13 @@ await t("origins: normalized, deduplicated, and one bad entry invalidates the li
   assert.deepEqual(parseOrigins("https://a.com, not a url"), []);
   assert.deepEqual(parseOrigins("javascript:alert(1)"), []);
   assert.deepEqual(parseOrigins(undefined), []);
+});
+await t("origins: production tokens require HTTPS even on the free-demo path", () => {
+  assert.equal(allowedOriginsAreSecure({ ...goodEnv, NODE_ENV: "production" }), true);
+  assert.equal(allowedOriginsAreSecure({ ...goodEnv, NODE_ENV: "production", VOICE_ALLOWED_ORIGINS: "http://widget.example.com" }), false);
+  assert.equal(allowedOriginsAreSecure({ ...goodEnv, NODE_ENV: "production", VOICE_ALLOWED_ORIGINS: "https://widget.example.com,http://localhost:3000" }), false);
+  assert.equal(allowedOriginsAreSecure({ ...goodEnv, VOICE_ALLOWED_ORIGINS: "http://localhost:3000" }), true);
+  assert.equal(allowedOriginsAreSecure({ ...goodEnv, VOICE_ALLOWED_ORIGINS: "" }), false);
 });
 await t("hold deadline = token expiry + max duration + grace", () => {
   assert.equal(holdDeadline(1_000_000, { maxCallSeconds: 600, startGraceSeconds: 120 }), 1_000_000 + 720_000);
