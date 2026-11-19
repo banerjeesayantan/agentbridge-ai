@@ -29,7 +29,7 @@ export const DashboardLayout = async ({
               <div className="flex min-h-0 flex-1">
                 <DashboardSidebar />
 
-                <main className="min-w-0 flex-1 overflow-y-auto">
+                <main className="min-h-0 min-w-0 w-full flex-1 overflow-x-hidden overflow-y-auto">
                   {children}
                 </main>
               </div>
