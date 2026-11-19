@@ -202,12 +202,12 @@ export const PlaygroundView = () => {
           <CardContent className="flex min-h-[300px] min-w-0 flex-1 items-stretch justify-center overflow-hidden p-2 sm:min-h-[360px] sm:p-4 xl:min-h-0">
             <div
               className={cn(
-                "w-full overflow-hidden border bg-white shadow-sm transition-[max-width] duration-200",
-                device === "mobile" ? "max-w-[375px] rounded-[1.75rem] border-4 border-foreground/80" : "rounded-lg",
+                "flex h-[min(70svh,720px)] min-h-[320px] w-full min-w-0 flex-col overflow-hidden border bg-white shadow-sm transition-[max-width] duration-200",
+                device === "mobile" ? "max-w-[375px] rounded-[1.75rem] border-4 border-foreground/80" : "max-w-none rounded-lg",
               )}
             >
               <iframe
-                className="size-full min-h-0 bg-white"
+                className="h-full min-h-0 w-full flex-1 bg-white"
                 key={preview.frameKey}
                 onLoad={preview.handleFrameLoad}
                 ref={preview.iframeRef}
@@ -229,8 +229,8 @@ export const PlaygroundView = () => {
               </TabsList>
             </div>
 
-            <ScrollArea className="min-h-0 flex-1">
-              <TabsContent className="space-y-5 p-4" value="configure">
+            <ScrollArea className="min-h-0 min-w-0 flex-1">
+              <TabsContent className="min-w-0 space-y-5 p-3 sm:p-4" value="configure">
                 <div className="space-y-2">
                   <Label htmlFor="playground-org-id">Organization ID</Label>
                   <Input
@@ -281,7 +281,7 @@ export const PlaygroundView = () => {
                 </p>
               </TabsContent>
 
-              <TabsContent className="space-y-5 p-4" value="install">
+              <TabsContent className="min-w-0 space-y-5 p-3 sm:p-4" value="install">
                 <ToggleGroup
                   aria-label="Integration type"
                   className="flex w-full flex-wrap justify-start gap-1"
@@ -339,7 +339,7 @@ export const PlaygroundView = () => {
                 </div>
               </TabsContent>
 
-              <TabsContent className="space-y-5 p-4" value="diagnostics">
+              <TabsContent className="min-w-0 space-y-5 p-3 sm:p-4" value="diagnostics">
                 <Card className="gap-0 py-0">
                   <CardHeader className="px-4 py-3">
                     <CardTitle className="text-sm">Status</CardTitle>
