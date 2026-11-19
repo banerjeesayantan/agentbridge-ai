@@ -32,24 +32,32 @@ export const deleteFile = mutation({
       throw new ConvexError({ code: "NOT_FOUND", message: "Not found" });
     }
 
-    let cursor: string | null = null;
-    let isDone = false;
+    // RAG entries can be pending while embeddings are generated, ready
+    // after ingestion, or replaced after a same-key upload. Search every
+    // lifecycle state so an owner can always remove their own stored file.
     let found = false;
 
-    while (!isDone) {
-      const result = await rag.list(ctx, {
-        namespaceId: namespace.namespaceId,
-        paginationOpts: { cursor, numItems: 100 },
-        status: "ready",
-      });
+    for (const status of ["pending", "ready", "replaced"] as const) {
+      let cursor: string | null = null;
+      let isDone = false;
 
-      if (result.page.some((item) => item.entryId === args.entryId)) {
-        found = true;
-        break;
+      while (!isDone) {
+        const result = await rag.list(ctx, {
+          namespaceId: namespace.namespaceId,
+          paginationOpts: { cursor, numItems: 100 },
+          status,
+        });
+
+        if (result.page.some((item) => item.entryId === args.entryId)) {
+          found = true;
+          break;
+        }
+
+        cursor = result.continueCursor;
+        isDone = result.isDone;
       }
 
-      cursor = result.continueCursor;
-      isDone = result.isDone;
+      if (found) break;
     }
 
     if (!found) {
