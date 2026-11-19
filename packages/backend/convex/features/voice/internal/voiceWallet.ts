@@ -701,6 +701,79 @@ async function settleReport(ctx: MutationCtx, eventKey: string, report: Provider
       return { ok: false as const, code: "RESERVATION_MISMATCH" as const };
     }
 
+    // A report can become an unmatched platform expense while its provider
+    // cost is still unknown. If a later provider delivery supplies the cost,
+    // reconcile the platform ledger without ever charging a tenant wallet.
+    if (
+      existingUsage.unreserved &&
+      existingUsage.costStatus === "pending" &&
+      report.costMicro !== undefined
+    ) {
+      const expense = await ctx.db
+        .query("providerExpenses")
+        .withIndex("by_provider_call_id", (q) =>
+          q.eq("providerCallId", report.providerCallId),
+        )
+        .first();
+
+      if (
+        expense &&
+        (expense.kind !== "paid_call" ||
+          expense.organizationId !== existingUsage.organizationId)
+      ) {
+        console.error("ALERT: unmatched provider expense identity mismatch", {
+          providerCallId: report.providerCallId,
+        });
+        return { ok: false as const, code: "RESERVATION_MISMATCH" as const };
+      }
+
+      await ctx.db.patch(existingUsage._id, {
+        costStatus: "known",
+        costMicro: report.costMicro,
+        rawCostUsd: report.rawCostUsd,
+      });
+
+      if (expense) {
+        await ctx.db.patch(expense._id, {
+          costStatus: "known",
+          costMicro: report.costMicro,
+        });
+      } else {
+        await ctx.db.insert("providerExpenses", {
+          kind: "paid_call",
+          providerCallId: report.providerCallId,
+          organizationId: existingUsage.organizationId,
+          costStatus: "known",
+          costMicro: report.costMicro,
+          unmatched: true,
+          createdAt: now,
+        });
+      }
+
+      const parked = await ctx.db
+        .query("unboundVoiceReports")
+        .withIndex("by_provider_call_id", (q) =>
+          q.eq("providerCallId", report.providerCallId),
+        )
+        .first();
+      if (parked && parked.costMicro === undefined) {
+        await ctx.db.patch(parked._id, {
+          costMicro: report.costMicro,
+          rawCostUsd: report.rawCostUsd,
+        });
+      }
+
+      if (!processed) {
+        await ctx.db.insert("processedProviderEvents", {
+          eventKey,
+          provider: "vapi",
+          receivedAt: now,
+        });
+      }
+
+      return { ok: true as const, outcome: "unreserved_cost_reconciled" as const };
+    }
+
     // Unreserved calls are platform expenses and must never debit a tenant.
     if (
       !existingUsage.unreserved &&
