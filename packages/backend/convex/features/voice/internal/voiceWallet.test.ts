@@ -705,6 +705,91 @@ describe("settlement: actual provider cost, never reservations, never zero for u
     await assertLedgerInvariants(t);
   });
 
+  it("reconciles a late cost for an unmatched call as a platform expense without charging a tenant", async () => {
+    const T0 = Date.UTC(2026, 10, 18, 12, 0, 0);
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(T0);
+
+    const t = newT();
+    await seed(t, T0);
+
+    expect(
+      await settle(t, {
+        providerCallId: "call_unmatched",
+        eventKey: "event-without-cost",
+        costMicro: undefined,
+      }),
+    ).toEqual({ ok: true, outcome: "pending_binding" });
+
+    vi.setSystemTime(T0 + 16 * 60 * 1000);
+    expect(
+      await t.mutation(
+        internal.features.voice.internal.voiceWallet.reconcileUnboundReports,
+        {},
+      ),
+    ).toEqual({ unmatched: 1, settled: 0, deferred: 0 });
+
+    expect(await walletFor(t, "org_A")).toMatchObject({
+      spentMicro: 0,
+      reservedMicro: 0,
+    });
+
+    expect(
+      await settle(t, {
+        providerCallId: "call_unmatched",
+        eventKey: "event-with-cost",
+        costMicro: 400_000,
+        rawCostUsd: 0.4,
+      }),
+    ).toEqual({ ok: true, outcome: "unreserved_cost_reconciled" });
+
+    const rows = await t.run(async (ctx) => ({
+      usage: await ctx.db
+        .query("voiceUsage")
+        .withIndex("by_provider_call_id", (q) =>
+          q.eq("providerCallId", "call_unmatched"),
+        )
+        .first(),
+      expense: await ctx.db
+        .query("providerExpenses")
+        .withIndex("by_provider_call_id", (q) =>
+          q.eq("providerCallId", "call_unmatched"),
+        )
+        .first(),
+      report: await ctx.db
+        .query("unboundVoiceReports")
+        .withIndex("by_provider_call_id", (q) =>
+          q.eq("providerCallId", "call_unmatched"),
+        )
+        .first(),
+    }));
+
+    expect(rows.usage).toMatchObject({
+      costStatus: "known",
+      costMicro: 400_000,
+      rawCostUsd: 0.4,
+      unreserved: true,
+    });
+    expect(rows.expense).toMatchObject({
+      kind: "paid_call",
+      costStatus: "known",
+      costMicro: 400_000,
+      unmatched: true,
+    });
+    expect(rows.report).toMatchObject({
+      status: "unmatched",
+      costMicro: 400_000,
+      rawCostUsd: 0.4,
+    });
+    expect(await walletFor(t, "org_A")).toMatchObject({
+      spentMicro: 0,
+      reservedMicro: 0,
+    });
+    await assertLedgerInvariants(t);
+  });
+
+
+
     it("settles a stale pending report when its reservation was subsequently bound", async () => {
     const T0 = Date.UTC(2026, 10, 17, 12, 0, 0);
 
