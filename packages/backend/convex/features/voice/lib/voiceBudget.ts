@@ -66,6 +66,13 @@ export function parseOrigins(raw: string | undefined): string[] {
   return out;
 }
 
+/** Production widget origins must be HTTPS, including for the free-demo token path. */
+export function allowedOriginsAreSecure(env: Env): boolean {
+  const origins = parseOrigins(env.VOICE_ALLOWED_ORIGINS);
+  return origins.length > 0 &&
+    (env.NODE_ENV !== "production" || origins.every((origin) => origin.startsWith("https://")));
+}
+
 export function readVoiceBudgetConfig(env: Env): VoiceBudgetConfig {
   // Budgets: unset => documented default; set-but-invalid => 0 (denies).
   const budget = (raw: string | undefined, fallback: number) => {
@@ -82,7 +89,7 @@ export function readVoiceBudgetConfig(env: Env): VoiceBudgetConfig {
   const concurrent = optionalInt(env.VOICE_MAX_CONCURRENT_PER_ORG, 1, 1, 20);
   const perSession = optionalInt(env.VOICE_MAX_AUTHORIZATIONS_PER_SESSION, 5, 1, 100);
 
-  const originsSecure = env.NODE_ENV !== "production" || allowedOrigins.every((origin) => origin.startsWith("https://"));
+  const originsSecure = allowedOriginsAreSecure(env);
 
   const ready =
     originsSecure &&
