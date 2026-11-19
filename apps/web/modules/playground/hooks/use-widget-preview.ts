@@ -180,13 +180,39 @@ for (const level of ["warn", "error"] as const) {
     (organizationId: string, position: WidgetPosition) => {
       setLastAction("init");
       withApi("init", (api) => {
+        // The embed's init() starts an asynchronous bootstrap request and
+        // returns before its launcher/iframe is mounted. Do not treat the
+        // immediate getState() result as an initialization failure.
         const result = api.init({ organizationId, position });
-        const state = sync();
-        if (result === false || (state && !state.initialized)) {
-          log("error", "init() rejected the configuration. See the preview errors above.");
-        } else {
-          log("success", `Initialized (position: ${position}).`);
+        if (result === false) {
+          sync();
+          log("error", "init() rejected the configuration before mounting. Check the organization ID and position.");
+          return;
         }
+
+        if (typeof api.getState !== "function") {
+          log("info", "Initialization requested. This widget bundle does not expose getState() for verification.");
+          return;
+        }
+
+        log("info", "Initialization accepted. Waiting for widget authorization and mount…");
+        void (async () => {
+          const deadline = Date.now() + 10_000;
+          while (Date.now() < deadline) {
+            await new Promise((resolve) => window.setTimeout(resolve, 250));
+            const state = sync();
+            if (state?.initialized && state.organizationId === organizationId) {
+              log("success", `Initialized (position: ${position}).`);
+              return;
+            }
+          }
+
+          sync();
+          log(
+            "error",
+            "Widget did not mount within 10 seconds. Check the preview errors above; common causes are a rejected /widget/bootstrap request, an origin missing from the organization's allowlist, or a missing WIDGET_INSTALLATION_SECRET.",
+          );
+        })();
       });
     },
     [log, sync, withApi],
