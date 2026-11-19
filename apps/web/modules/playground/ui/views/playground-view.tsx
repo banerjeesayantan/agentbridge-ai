@@ -124,20 +124,20 @@ export const PlaygroundView = () => {
   const snippet = createScript(framework, orgId || "YOUR_ORGANIZATION_ID", position);
 
   return (
-    <div className="flex min-h-full min-w-0 flex-col bg-muted xl:h-full xl:overflow-hidden">
-      <header className="flex h-14 shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-b bg-background px-4 py-2">
+    <div className="flex min-h-full w-full min-w-0 max-w-full flex-col overflow-x-hidden bg-muted xl:h-full xl:overflow-hidden">
+      <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-b bg-background px-3 py-2 sm:px-4">
         <SidebarTrigger aria-label="Toggle sidebar" />
         <Separator className="h-5" orientation="vertical" />
         <h1 className="font-semibold text-base">Playground</h1>
-        <div aria-live="polite" className="ml-auto flex items-center gap-2">
+        <div aria-live="polite" className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
           <StatusBadge tone={bundle.tone}>{bundle.text}</StatusBadge>
           {widgetBadge && <StatusBadge tone={widgetBadge.tone}>{widgetBadge.text}</StatusBadge>}
         </div>
       </header>
 
-      <div className="grid min-w-0 flex-1 grid-cols-1 gap-4 p-3 sm:p-4 2xl:min-h-0 2xl:grid-cols-[minmax(0,1fr)_minmax(360px,400px)]">
+      <div className="grid w-full min-w-0 flex-1 grid-cols-1 gap-3 p-2 sm:gap-4 sm:p-4 xl:min-h-0 xl:grid-cols-[minmax(0,1fr)_minmax(320px,380px)]">
         {/* Preview canvas */}
-        <Card className="flex min-h-[520px] min-w-0 flex-col gap-0 overflow-hidden py-0 2xl:min-h-0">
+        <Card className="flex min-h-[400px] min-w-0 max-w-full flex-col gap-0 overflow-hidden py-0 sm:min-h-[460px] xl:min-h-0">
           <CardHeader className="flex flex-col items-stretch gap-3 border-b px-4 py-3 sm:flex-row sm:items-center">
             <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:w-auto" role="toolbar" aria-label="Widget lifecycle">
               <Button className="shrink-0" disabled={!canInit} onClick={() => actions.init(orgId, position)} size="sm" type="button">
@@ -199,15 +199,15 @@ export const PlaygroundView = () => {
             </div>
           )}
 
-          <CardContent className="flex min-h-[420px] min-w-0 flex-1 items-stretch justify-center overflow-hidden p-3 sm:p-4">
+          <CardContent className="flex min-h-[300px] min-w-0 flex-1 items-stretch justify-center overflow-hidden p-2 sm:min-h-[360px] sm:p-4 xl:min-h-0">
             <div
               className={cn(
-                "h-[min(70vh,720px)] min-h-[420px] w-full min-w-0 overflow-hidden border bg-white shadow-sm transition-[max-width] duration-200",
+                "h-[min(62dvh,720px)] min-h-[280px] w-full min-w-0 overflow-hidden border bg-white shadow-sm transition-[max-width] duration-200 sm:min-h-[340px] xl:h-full xl:min-h-0",
                 device === "mobile" ? "max-w-[375px] rounded-[1.75rem] border-4 border-foreground/80" : "rounded-lg",
               )}
             >
               <iframe
-                className="block size-full min-h-[420px] w-full border-0 bg-white"
+                className="block size-full min-h-0 w-full border-0 bg-white"
                 key={preview.frameKey}
                 onLoad={preview.handleFrameLoad}
                 ref={preview.iframeRef}
@@ -219,13 +219,13 @@ export const PlaygroundView = () => {
         </Card>
 
         {/* Configure / Install / Diagnostics */}
-        <Card className="min-h-[520px] min-w-0 gap-0 py-0 xl:min-h-0">
+        <Card className="min-h-[400px] min-w-0 max-w-full gap-0 overflow-hidden py-0 xl:min-h-0">
           <Tabs className="flex min-h-0 flex-1 flex-col gap-0" defaultValue="configure">
             <div className="border-b p-3">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="configure">Configure</TabsTrigger>
-                <TabsTrigger value="install">Install</TabsTrigger>
-                <TabsTrigger value="diagnostics">Diagnostics</TabsTrigger>
+              <TabsList className="grid h-auto w-full grid-cols-3">
+                <TabsTrigger className="min-w-0 px-2 text-xs sm:text-sm" value="configure">Configure</TabsTrigger>
+                <TabsTrigger className="min-w-0 px-2 text-xs sm:text-sm" value="install">Install</TabsTrigger>
+                <TabsTrigger className="min-w-0 px-2 text-xs sm:text-sm" value="diagnostics">Diagnostics</TabsTrigger>
               </TabsList>
             </div>
 
@@ -284,14 +284,14 @@ export const PlaygroundView = () => {
               <TabsContent className="space-y-5 p-4" value="install">
                 <ToggleGroup
                   aria-label="Integration type"
-                  className="w-full"
+                  className="flex w-full flex-wrap justify-start gap-1"
                   onValueChange={(value) => value && setFramework(value as IntegrationId)}
                   type="single"
                   value={framework}
                   variant="outline"
                 >
                   {INTEGRATIONS.map((integration) => (
-                    <ToggleGroupItem key={integration.id} value={integration.id}>
+                    <ToggleGroupItem className="min-w-0 flex-1 px-2 text-xs sm:text-sm" key={integration.id} value={integration.id}>
                       {integration.title}
                     </ToggleGroupItem>
                   ))}
