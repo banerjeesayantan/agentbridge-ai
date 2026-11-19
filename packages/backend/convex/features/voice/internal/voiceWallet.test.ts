@@ -711,7 +711,10 @@ describe("settlement: actual provider cost, never reservations, never zero for u
     vi.setSystemTime(T0);
 
     const t = newT();
-    await seed(t, T0);
+    const s = await seed(t, T0);
+    // Keep a real organization wallet and an unrelated open hold so the test
+    // can prove the unmatched provider cost never changes tenant spending.
+    await openOk(t, s.A1);
 
     expect(
       await settle(t, {
@@ -731,7 +734,7 @@ describe("settlement: actual provider cost, never reservations, never zero for u
 
     expect(await walletFor(t, "org_A")).toMatchObject({
       spentMicro: 0,
-      reservedMicro: 0,
+      reservedMicro: RESERVE,
     });
 
     expect(
