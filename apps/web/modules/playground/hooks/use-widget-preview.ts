@@ -181,12 +181,26 @@ for (const level of ["warn", "error"] as const) {
       setLastAction("init");
       withApi("init", (api) => {
         const result = api.init({ organizationId, position });
-        const state = sync();
-        if (result === false || (state && !state.initialized)) {
-          log("error", "init() rejected the configuration. See the preview errors above.");
-        } else {
-          log("success", `Initialized (position: ${position}).`);
+        if (result === false) {
+          log("error", "init() rejected the configuration before mounting. Check the organization ID and widget position.");
+          return;
         }
+
+        log("info", "Initialization accepted; requesting widget authorization and loading the chat frame…");
+        const startedAt = Date.now();
+        const verifyMount = () => {
+          const state = sync();
+          if (state?.initialized) {
+            log("success", `Widget initialized successfully (position: ${position}).`);
+            return;
+          }
+          if (Date.now() - startedAt >= 10000) {
+            log("error", "Widget did not mount within 10 seconds. Check the preceding preview errors for authorization, allowed-origin, or network failures.");
+            return;
+          }
+          window.setTimeout(verifyMount, 250);
+        };
+        window.setTimeout(verifyMount, 250);
       });
     },
     [log, sync, withApi],
