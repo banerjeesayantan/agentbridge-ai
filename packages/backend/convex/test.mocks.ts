@@ -12,7 +12,7 @@ type FakeEntry = {
   title?: string;
   metadata?: Record<string, unknown>;
   contentHash?: string;
-  status: "ready";
+  status: "pending" | "ready" | "replaced";
   namespace: string;
 };
 
@@ -24,12 +24,16 @@ export const resetFakeRag = () => {
   state.seq = 0;
 };
 export const fakeRagEntries = () => [...state.entries.values()];
+export const setFakeRagStatus = (entryId: string, status: FakeEntry["status"]) => {
+  const entry = state.entries.get(entryId);
+  if (entry) entry.status = status;
+};
 
 export const fakeRag = {
   getNamespace: async (_ctx: unknown, a: { namespace: string }) => state.namespaces.get(a.namespace) ?? null,
-  list: async (_ctx: unknown, a: { namespaceId: string; paginationOpts: { numItems: number } }) => {
+  list: async (_ctx: unknown, a: { namespaceId: string; paginationOpts: { numItems: number }; status?: FakeEntry["status"] }) => {
     const ns = [...state.namespaces.entries()].find(([, v]) => v.namespaceId === a.namespaceId)?.[0];
-    const page = [...state.entries.values()].filter((e) => e.namespace === ns).slice(0, a.paginationOpts.numItems);
+    const page = [...state.entries.values()].filter((e) => e.namespace === ns && (a.status === undefined || e.status === a.status)).slice(0, a.paginationOpts.numItems);
     return { page, isDone: true, continueCursor: "" };
   },
   getEntry: async (_ctx: unknown, a: { entryId: string }) => state.entries.get(a.entryId) ?? null,
