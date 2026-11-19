@@ -90,6 +90,23 @@ describe("handlePolarOrderEvent", () => {
     ).toEqual({ status: 500 });
   });
 
+  it("does not silently acknowledge a refund event without its cumulative amount", async () => {
+    const t = newT();
+    const { refunded_amount: _omitted, ...withoutRefund } = order({
+      status: "refunded",
+      refunded_amount: undefined,
+    });
+
+    expect(await run(t, "order.refunded", withoutRefund)).toEqual({
+      status: 200,
+    });
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining("ALERT"),
+      expect.objectContaining({ reason: "invalid refunded amount" }),
+    );
+    expect(await entries(t)).toHaveLength(0);
+  });
+
   it("does not fund anything from a refunded-only or unpaid event", async () => {
     const t = newT();
     expect(
