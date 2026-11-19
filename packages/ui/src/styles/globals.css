@@ -201,6 +201,11 @@ body {
   width: 100%;
 }
 
+/* Keep app content hidden until device detection runs to avoid a mobile flash. */
+html:not(.device-detection-complete) .desktop-app-content {
+  visibility: hidden;
+}
+
 .mobile-access-notice {
   display: none;
 }
