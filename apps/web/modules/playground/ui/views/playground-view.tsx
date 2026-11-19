@@ -134,7 +134,7 @@ export const PlaygroundView = () => {
 
       <div className="grid min-h-0 w-full min-w-0 flex-1 grid-cols-1 gap-3 overflow-y-auto p-2 sm:gap-3 sm:p-3 xl:grid-cols-[minmax(0,1fr)_minmax(300px,340px)] xl:overflow-hidden">
         {/* Preview canvas */}
-        <Card className="flex min-h-[400px] min-w-0 max-w-full flex-col gap-0 overflow-hidden py-0 sm:min-h-[460px] xl:min-h-0">
+        <Card className="flex min-h-[280px] min-w-0 max-w-full flex-col gap-0 overflow-hidden py-0 xl:min-h-0">
           <CardHeader className="flex flex-col items-stretch gap-3 border-b px-3 py-3 sm:flex-row sm:items-center sm:px-4">
             <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:w-auto" role="toolbar" aria-label="Widget lifecycle">
               <Button disabled={!canInit} onClick={() => actions.init(orgId, position)} size="sm" type="button">
@@ -196,7 +196,7 @@ export const PlaygroundView = () => {
         </Card>
 
         {/* Configure / Install / Diagnostics */}
-        <Card className="flex min-h-[400px] min-w-0 max-w-full flex-col gap-0 overflow-hidden py-0 sm:min-h-[460px] xl:min-h-0">
+        <Card className="flex min-h-[280px] min-w-0 max-w-full flex-col gap-0 overflow-hidden py-0 xl:min-h-0">
           <Tabs className="flex min-h-0 flex-1 flex-col gap-0" defaultValue="configure">
             <div className="border-b p-3">
               <TabsList className="grid h-auto w-full grid-cols-3">
