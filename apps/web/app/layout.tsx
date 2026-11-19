@@ -1,10 +1,10 @@
-
 import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Geist, Geist_Mono } from "next/font/google";
 
 import "@workspace/ui/globals.css";
 import { Providers } from "@/components/providers";
+import { DesktopOnlyGate } from "@/components/desktop-only-gate";
 import { Toaster } from "@workspace/ui/components/sonner";
 
 const fontSans = Geist({
@@ -52,18 +52,20 @@ export default function RootLayout({
       <body
         className={`${fontSans.variable} ${fontMono.variable} font-sans antialiased`}
       >
-        <ClerkProvider
-          appearance={{
-            variables: {
-              colorPrimary: "#3C82F6",
-            },
-          }}
-        >
-          <Providers>
-            <Toaster />
-            {children}
-          </Providers>
-        </ClerkProvider>
+        <DesktopOnlyGate>
+          <ClerkProvider
+            appearance={{
+              variables: {
+                colorPrimary: "#3C82F6",
+              },
+            }}
+          >
+            <Providers>
+              <Toaster />
+              {children}
+            </Providers>
+          </ClerkProvider>
+        </DesktopOnlyGate>
       </body>
     </html>
   );
