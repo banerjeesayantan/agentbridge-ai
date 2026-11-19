@@ -1,10 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Alert, AlertDescription, AlertTitle } from "@workspace/ui/components/alert";
-import { Button } from "@workspace/ui/components/button";
-import { SparklesIcon, XIcon } from "lucide-react";
-import Link from "next/link";
+import { XIcon } from "lucide-react";
 
 export function DashboardCheckoutNotice() {
   const [status, setStatus] = useState<"success" | "cancelled" | null>(null);
@@ -31,40 +28,27 @@ export function DashboardCheckoutNotice() {
 
   if (!status) return null;
 
-  const dismissButton = (
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon"
-      className="absolute right-2 top-2 size-8"
-      aria-label="Dismiss checkout notification"
-      title="Dismiss"
-      onClick={() => setStatus(null)}
-    >
-      <XIcon className="size-4" />
-    </Button>
-  );
+  const message =
+    status === "success"
+      ? "Checkout successful — your subscription is being confirmed."
+      : "Checkout cancelled — no changes were made to your current plan.";
 
-  return status === "success" ? (
-    <Alert className="relative mx-4 mt-4 pr-12">
-      {dismissButton}
-      <SparklesIcon className="size-4" />
-      <AlertTitle>Checkout completed — confirming your subscription</AlertTitle>
-      <AlertDescription>
-        Polar is confirming your subscription. Paid features become available
-        after the verified webhook updates your organization.
-      </AlertDescription>
-      <Button asChild className="mt-3"><Link href="/">Return to Dashboard</Link></Button>
-    </Alert>
-  ) : (
-    <Alert className="relative mx-4 mt-4 pr-12">
-      {dismissButton}
-      <AlertTitle>Checkout cancelled</AlertTitle>
-      <AlertDescription>
-        No new subscription was activated. Your current plan is unchanged, and
-        you can return to billing whenever you are ready.
-      </AlertDescription>
-      <Button asChild variant="outline" className="mt-3"><Link href="/">Return to Dashboard</Link></Button>
-    </Alert>
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="mx-4 mt-3 flex min-h-10 items-center gap-3 rounded-md border bg-muted/70 px-3 py-2 text-sm"
+    >
+      <p className="min-w-0 flex-1 truncate">{message}</p>
+      <button
+        type="button"
+        onClick={() => setStatus(null)}
+        aria-label="Dismiss checkout notification"
+        title="Dismiss"
+        className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <XIcon className="size-4" />
+      </button>
+    </div>
   );
 }
