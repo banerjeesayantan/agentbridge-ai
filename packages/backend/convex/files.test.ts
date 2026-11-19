@@ -176,3 +176,26 @@ describe("storage lifecycle and ownership", () => {
     expect(fakeRagEntries()).toHaveLength(0);
   });
 });
+
+  it("prevents another organization from downloading or deleting a file", async () => {
+    const t = newT();
+    const { entryId } = await add(t, "private.txt", enc("org A secret")) as {
+      entryId: string;
+    };
+
+    await expect(
+      t.withIdentity(identity("org_B", "org:member")).action(
+        api.private.files.getDownloadUrl,
+        { entryId: entryId as never },
+      ),
+    ).rejects.toThrow();
+
+    await expect(
+      admin(t, "org_B").mutation(api.private.files.deleteFile, {
+        entryId: entryId as never,
+      }),
+    ).rejects.toThrow();
+
+    expect(fakeRagEntries()).toHaveLength(1);
+    expect(await storageCount(t)).toBe(1);
+  });

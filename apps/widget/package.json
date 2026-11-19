@@ -18,7 +18,7 @@
     "@workspace/backend": "workspace:*",
     "@workspace/math": "workspace:*",
     "@workspace/ui": "workspace:*",
-    "convex": "^1.28.2",
+    "convex": "^1.46.0",
     "date-fns": "^4.1.0",
     "jotai": "^2.12.5",
     "lucide-react": "^0.475.0",

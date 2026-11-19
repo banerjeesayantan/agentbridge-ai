@@ -1,4 +1,5 @@
-import { ArrowLeftIcon, MicIcon, MicOffIcon } from "lucide-react";
+
+import { ArrowLeftIcon, MicIcon, MicOffIcon, XIcon } from "lucide-react";
 import { Button } from "@workspace/ui/components/button";
 import {
   AIConversation,
@@ -25,6 +26,8 @@ export const WidgetVoiceScreen = () => {
     startCall,
     endCall,
     isConnecting,
+    notice,
+    dismissNotice,
   } = useVapi();
 
   return (
@@ -42,6 +45,25 @@ export const WidgetVoiceScreen = () => {
           <p>Voice Chat</p>
         </div>
       </WidgetHeader>
+
+      {notice && (
+        <div
+          role="alert"
+          className="mx-4 mt-3 flex items-start justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm"
+        >
+          <p className="text-destructive">{notice}</p>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-6 shrink-0"
+            aria-label="Dismiss error"
+            onClick={dismissNotice}
+          >
+            <XIcon className="size-4" />
+          </Button>
+        </div>
+      )}
 
       {transcript.length > 0 ? (
         <AIConversation className="h-full">
@@ -91,7 +113,7 @@ export const WidgetVoiceScreen = () => {
                 className="w-full"
                 size="lg"
                 variant="destructive"
-                onClick={() => endCall()}
+                onClick={endCall}
               >
                 <MicOffIcon />
                 End call
@@ -101,7 +123,7 @@ export const WidgetVoiceScreen = () => {
                 className="w-full"
                 disabled={isConnecting}
                 size="lg"
-                onClick={() => startCall()}
+                onClick={startCall}
               >
                 <MicIcon />
                 {isConnecting ? "Checking access..." : "Start call"}
@@ -110,7 +132,6 @@ export const WidgetVoiceScreen = () => {
           </div>
         </div>
       </div>
-
     </>
   );
 };

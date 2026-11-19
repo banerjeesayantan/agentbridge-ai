@@ -1,0 +1,92 @@
+﻿diff --git a/src/definePlaygroundAPI.ts b/src/definePlaygroundAPI.ts
+index 6ac63a309252917aa64354d4951f489d7112ca54..666d71c68b98a7a92ac8704eff92b62d4254275e 100644
+--- a/src/definePlaygroundAPI.ts
++++ b/src/definePlaygroundAPI.ts
+@@ -55,9 +55,6 @@ export function definePlaygroundAPI<DataModel extends GenericDataModel>(
+     }
+   }
+ 
+-  async function validateApiKey(ctx: RunQueryCtx, apiKey: string) {
+-    await ctx.runQuery(component.apiKeys.validate, { apiKey });
+-  }
+ 
+   const isApiKeyValid = queryGeneric({
+     args: {
+@@ -65,7 +62,7 @@ export function definePlaygroundAPI<DataModel extends GenericDataModel>(
+     },
+     handler: async (ctx, args) => {
+       try {
+-        await validateApiKey(ctx, args.apiKey);
++        await ctx.runQuery(component.apiKeys.validate, { apiKey: args.apiKey });
+         return true;
+       } catch {
+         return false;
+@@ -100,7 +97,7 @@ export function definePlaygroundAPI<DataModel extends GenericDataModel>(
+         userId: args.userId,
+         threadId: args.threadId,
+       });
+-      await validateApiKey(ctx, args.apiKey);
++      await ctx.runQuery(component.apiKeys.validate, { apiKey: args.apiKey });
+       return agents.map(({ name, agent }) => ({
+         name,
+         instructions: agent.options.instructions,
+@@ -119,7 +116,7 @@ export function definePlaygroundAPI<DataModel extends GenericDataModel>(
+       paginationOpts: paginationOptsValidator,
+     },
+     handler: async (ctx, args) => {
+-      await validateApiKey(ctx, args.apiKey);
++      await ctx.runQuery(component.apiKeys.validate, { apiKey: args.apiKey });
+       const users = await ctx.runQuery(component.users.listUsersWithThreads, {
+         paginationOpts: args.paginationOpts,
+       });
+@@ -149,7 +146,7 @@ export function definePlaygroundAPI<DataModel extends GenericDataModel>(
+       paginationOpts: paginationOptsValidator,
+     },
+     handler: async (ctx, args) => {
+-      await validateApiKey(ctx, args.apiKey);
++      await ctx.runQuery(component.apiKeys.validate, { apiKey: args.apiKey });
+       const results = await ctx.runQuery(
+         component.threads.listThreadsByUserId,
+         {
+@@ -200,7 +197,7 @@ export function definePlaygroundAPI<DataModel extends GenericDataModel>(
+       paginationOpts: paginationOptsValidator,
+     },
+     handler: async (ctx, args) => {
+-      await validateApiKey(ctx, args.apiKey);
++      await ctx.runQuery(component.apiKeys.validate, { apiKey: args.apiKey });
+       return ctx.runQuery(component.messages.listMessagesByThreadId, {
+         threadId: args.threadId,
+         paginationOpts: args.paginationOpts,
+@@ -227,7 +224,7 @@ export function definePlaygroundAPI<DataModel extends GenericDataModel>(
+       //     "Upgrade to the latest version of @convex-dev/agent-playground"
+       //   );
+       // }
+-      await validateApiKey(ctx, args.apiKey);
++      await ctx.runQuery(component.apiKeys.validate, { apiKey: args.apiKey });
+       const { _id } = await ctx.runMutation(component.threads.createThread, {
+         userId: args.userId,
+         title: args.title,
+@@ -264,7 +261,7 @@ export function definePlaygroundAPI<DataModel extends GenericDataModel>(
+         system,
+         ...rest
+       } = args;
+-      await validateApiKey(ctx, apiKey);
++      await ctx.runQuery(component.apiKeys.validate, { apiKey });
+       const agents = await getAgents(ctx, {
+         userId: args.userId,
+         threadId: args.threadId,
+@@ -296,7 +293,7 @@ export function definePlaygroundAPI<DataModel extends GenericDataModel>(
+       beforeMessageId: v.optional(v.string()),
+     },
+     handler: async (ctx, args) => {
+-      await validateApiKey(ctx, args.apiKey);
++      await ctx.runQuery(component.apiKeys.validate, { apiKey: args.apiKey });
+       const agents = await getAgents(ctx, {
+         userId: args.userId,
+         threadId: args.threadId,
+@@ -338,4 +335,4 @@ export function definePlaygroundAPI<DataModel extends GenericDataModel>(
+   };
+ }
+ 
+-type RunQueryCtx = { runQuery: GenericQueryCtx<GenericDataModel>["runQuery"] };
++

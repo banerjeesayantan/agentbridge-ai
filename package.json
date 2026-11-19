@@ -19,5 +19,10 @@
   "packageManager": "pnpm@10.4.1",
   "engines": {
     "node": ">=20"
+  },
+  "pnpm": {
+    "patchedDependencies": {
+      "@convex-dev/agent-playground@0.0.17": "patches/@convex-dev__agent-playground@0.0.17.patch"
+    }
   }
 }

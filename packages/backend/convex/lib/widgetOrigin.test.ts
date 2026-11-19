@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { normalizeAllowedOrigins, signWidgetInstallToken, verifyWidgetInstallToken } from "./widgetOrigin";
 
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => { vi.unstubAllEnvs(); });
 
 describe("widget installation origin policy", () => {
   it("normalizes HTTPS origins and local development origins", () => {

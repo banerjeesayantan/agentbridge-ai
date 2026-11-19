@@ -1,4 +1,3 @@
-
 "use client";
 
 import { api } from "@workspace/backend/_generated/api";
@@ -86,9 +85,7 @@ export const PricingTable = () => {
       .catch((error: unknown) => {
         if (cancelled) return;
 
-        setCatalogError(
-          getErrorMessage(error, "Couldn't load plan prices."),
-        );
+        setCatalogError(getErrorMessage(error, "Couldn't load plan prices."));
         setCatalog([]);
       });
 
@@ -103,10 +100,7 @@ export const PricingTable = () => {
 
     if (checkout === "success" || checkout === "return") {
       setCheckoutStatus("success");
-    } else if (
-      checkout === "cancelled" ||
-      checkout === "cancel"
-    ) {
+    } else if (checkout === "cancelled" || checkout === "cancel") {
       setCheckoutStatus("cancelled");
     }
 
@@ -142,10 +136,7 @@ export const PricingTable = () => {
       window.location.assign(url);
     } catch (error) {
       toast.error(
-        getErrorMessage(
-          error,
-          "Couldn't start billing. Please try again.",
-        ),
+        getErrorMessage(error, "Couldn't start billing. Please try again."),
       );
 
       setPending(null);
@@ -186,9 +177,7 @@ export const PricingTable = () => {
     ];
   };
 
-  const getCatalogPlan = (
-    key: PlanKey,
-  ): CatalogPlan | undefined => {
+  const getCatalogPlan = (key: PlanKey): CatalogPlan | undefined => {
     if (key === "free") return undefined;
 
     return catalog.find((item) => item.plan === key);
@@ -206,8 +195,8 @@ export const PricingTable = () => {
           </AlertTitle>
           <AlertDescription>
             Your paid features will appear after Polar confirms the
-            subscription. You can continue using the dashboard while
-            this is being processed.
+            subscription. You can continue using the dashboard while this is
+            being processed.
           </AlertDescription>
         </Alert>
       )}
@@ -216,8 +205,8 @@ export const PricingTable = () => {
         <Alert>
           <AlertTitle>Checkout cancelled</AlertTitle>
           <AlertDescription>
-            No new subscription was confirmed. You can continue using
-            your current plan or choose a paid plan whenever you are ready.
+            No new subscription was confirmed. You can continue using your
+            current plan or choose a paid plan whenever you are ready.
           </AlertDescription>
         </Alert>
       )}
@@ -247,12 +236,7 @@ export const PricingTable = () => {
           const isHighlighted = key === "pro";
           const isEnterprise = key === "enterprise";
 
-          const price =
-            isFree
-              ? "$0"
-              : entry
-                ? formatPrice(entry)
-                : null;
+          const price = isFree ? "$0" : entry ? formatPrice(entry) : null;
 
           if (!plan) {
             return (
@@ -260,9 +244,7 @@ export const PricingTable = () => {
                 key={key}
                 className="flex min-h-[520px] flex-col rounded-xl border bg-card p-6"
               >
-                <h3 className="text-xl font-semibold">
-                  {PLAN_NAMES[key]}
-                </h3>
+                <h3 className="text-xl font-semibold">{PLAN_NAMES[key]}</h3>
                 <p className="mt-2 text-sm text-muted-foreground">
                   Plan details are temporarily unavailable.
                 </p>
@@ -281,9 +263,7 @@ export const PricingTable = () => {
             >
               {isHighlighted && (
                 <div className="absolute -top-3 left-6">
-                  <Badge className="rounded-full px-3">
-                    Most popular
-                  </Badge>
+                  <Badge className="rounded-full px-3">Most popular</Badge>
                 </div>
               )}
 
@@ -311,8 +291,7 @@ export const PricingTable = () => {
               <div className="mt-8">
                 <div className="flex items-end gap-2">
                   <span className="text-4xl font-semibold tracking-tight">
-                    {price ??
-                      (isEnterprise ? "Custom" : "Unavailable")}
+                    {price ?? (isEnterprise ? "Custom" : "Unavailable")}
                   </span>
 
                   {price && !isFree && entry?.interval && (
@@ -340,14 +319,10 @@ export const PricingTable = () => {
               <div className="flex flex-1 flex-col">
                 <ul className="space-y-4 text-sm">
                   {describe(key).map((feature) => {
-                    const isVoiceFeature =
-                      feature === "No voice assistant";
+                    const isVoiceFeature = feature === "No voice assistant";
 
                     return (
-                      <li
-                        key={feature}
-                        className="flex items-start gap-3"
-                      >
+                      <li key={feature} className="flex items-start gap-3">
                         <CheckIcon
                           className="mt-0.5 size-4 shrink-0 text-muted-foreground"
                           aria-hidden="true"
@@ -384,9 +359,7 @@ export const PricingTable = () => {
                       <Button
                         className="w-full transition-all group-hover:shadow-md"
                         variant="outline"
-                        onClick={() =>
-                          window.location.assign("/dashboard")
-                        }
+                        onClick={() => window.location.assign("/")}
                       >
                         Continue with Free
                         <ArrowRightIcon className="ml-2 size-4 transition-transform group-hover:translate-x-1" />
@@ -398,10 +371,7 @@ export const PricingTable = () => {
                       variant="outline"
                       disabled={pending !== null}
                       onClick={() =>
-                        redirect(
-                          "portal",
-                          () => createPortalSession({}),
-                        )
+                        redirect("portal", () => createPortalSession({}))
                       }
                     >
                       {pending === "portal" ? (
@@ -418,10 +388,7 @@ export const PricingTable = () => {
                       variant="outline"
                       disabled={pending !== null}
                       onClick={() =>
-                        redirect(
-                          "portal",
-                          () => createPortalSession({}),
-                        )
+                        redirect("portal", () => createPortalSession({}))
                       }
                     >
                       {pending === "portal" ? (
@@ -441,12 +408,10 @@ export const PricingTable = () => {
                       variant={isHighlighted ? "default" : "outline"}
                       disabled={pending !== null}
                       onClick={() =>
-                        redirect(
-                          key,
-                          () =>
-                            createCheckout({
-                              plan: key as PaidPlanKey,
-                            }),
+                        redirect(key, () =>
+                          createCheckout({
+                            plan: key as PaidPlanKey,
+                          }),
                         )
                       }
                     >
@@ -471,8 +436,8 @@ export const PricingTable = () => {
       </div>
 
       <p className="text-center text-xs text-muted-foreground">
-        Need custom Enterprise limits or support? Contact us to discuss
-        your requirements.
+        Need custom Enterprise limits or support? Contact us to discuss your
+        requirements.
       </p>
     </div>
   );
