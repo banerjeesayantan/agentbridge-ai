@@ -28,7 +28,7 @@ export const DicebearAvatar = ({
       return imageUrl;
     }
 
-    const avatar = createAvatar(glass, {
+    const avatar = createAvatar(glass(), {
       seed: seed.toLowerCase().trim(),
       size,
     });
