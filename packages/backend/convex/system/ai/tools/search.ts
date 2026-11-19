@@ -26,10 +26,16 @@ export const search = createTool({
       return "Conversation not found";
     }
 
+    const searchStartedAt = Date.now();
     const searchResult = await rag.search(ctx, {
       namespace: conversation.organizationId,
       query: args.query,
       limit: 5,
+    });
+    console.info("[performance] knowledge_search", {
+      durationMs: Date.now() - searchStartedAt,
+      resultChars: searchResult.text.length,
+      resultCount: searchResult.entries.length,
     });
 
     if (!searchResult.text.trim()) {
