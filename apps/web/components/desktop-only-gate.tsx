@@ -1,14 +1,31 @@
-import type { ReactNode } from "react";
+"use client";
+
+import { useEffect, type ReactNode } from "react";
+
+const MOBILE_DEVICE_PATTERN =
+  /Android.*Mobile|iPhone|iPod|Windows Phone|IEMobile|BlackBerry|Opera Mini/i;
 
 export function DesktopOnlyGate({ children }: { children: ReactNode }) {
+  useEffect(() => {
+    const root = document.documentElement;
+    const media = window.matchMedia("(max-width: 767px)");
+    const update = () => {
+      const isPhone = MOBILE_DEVICE_PATTERN.test(navigator.userAgent);
+      root.classList.toggle("is-mobile-device", isPhone || media.matches);
+    };
+
+    update();
+    media.addEventListener("change", update);
+    return () => {
+      media.removeEventListener("change", update);
+      root.classList.remove("is-mobile-device");
+    };
+  }, []);
+
   return (
     <>
       <div className="desktop-app-content">{children}</div>
-      <main
-        className="mobile-access-notice"
-        role="status"
-        aria-labelledby="mobile-access-title"
-      >
+      <main className="mobile-access-notice" role="status" aria-labelledby="mobile-access-title">
         <section className="mobile-access-card">
           <div className="mobile-access-icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none">
