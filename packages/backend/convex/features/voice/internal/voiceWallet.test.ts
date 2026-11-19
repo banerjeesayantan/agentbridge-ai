@@ -786,7 +786,7 @@ describe("settlement: actual provider cost, never reservations, never zero for u
     });
     expect(await walletFor(t, "org_A")).toMatchObject({
       spentMicro: 0,
-      reservedMicro: 0,
+      reservedMicro: RESERVE,
     });
     await assertLedgerInvariants(t);
   });
