@@ -22,7 +22,12 @@ export const addRagEntry = internalAction({
     contentHash: v.string(),
   },
   handler: async (ctx, args) => {
-    const { entryId, created, replacedEntry } = await rag.add(ctx, {
+    // RAG's published context type is narrower than Convex's generated
+    // ActionCtx type, although its documented action usage is supported.
+    // Keep the cast at this integration boundary; the runtime context exposes
+    // the required runMutation capability.
+    const ragContext = ctx as unknown as Parameters<typeof rag.add>[0];
+    const { entryId, created, replacedEntry } = await rag.add(ragContext, {
       namespace: args.organizationId,
       text: args.text,
       key: args.filename,
