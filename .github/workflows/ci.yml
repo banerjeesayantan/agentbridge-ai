@@ -37,6 +37,37 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Informational until the existing Dependabot backlog is triaged.
+      # Keep the report in the job log so high/critical advisories are actionable.
+      - name: Audit dependency advisories
+        continue-on-error: true
+        run: |
+          pnpm audit --json > "$RUNNER_TEMP/pnpm-audit.json" || true
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const report = JSON.parse(fs.readFileSync(
+            process.env.RUNNER_TEMP + "/pnpm-audit.json",
+            "utf8",
+          ));
+          const counts = report.metadata?.vulnerabilities ?? {};
+          console.log("Dependency audit counts:", JSON.stringify(counts));
+          const vulnerabilities = report.vulnerabilities ?? report.advisories ?? {};
+          for (const [name, item] of Object.entries(vulnerabilities)) {
+            const via = Array.isArray(item.via)
+              ? item.via.map((entry) => typeof entry === "string"
+                  ? entry
+                  : { title: entry.title, url: entry.url, range: entry.range, severity: entry.severity })
+              : item.via;
+            console.log(JSON.stringify({
+              name,
+              severity: item.severity,
+              range: item.range,
+              fixAvailable: item.fixAvailable,
+              via,
+            }));
+          }
+          NODE
+
       - name: Run backend policy tests
         run: pnpm test
 
