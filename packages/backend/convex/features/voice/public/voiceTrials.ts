@@ -5,7 +5,7 @@ import { RATE } from "../../../lib/limits";
 import { rateLimited } from "../../../lib/rateLimit";
 import { loadCentralVapiCredentials } from "../lib/vapiCentral";
 import { signVapiPublicToken } from "../lib/vapiJwt";
-import { readVoiceBudgetConfig } from "../lib/voiceBudget";
+import { allowedOriginsAreSecure, readVoiceBudgetConfig } from "../lib/voiceBudget";
 
 const DEMO_TOKEN_TTL_MS = 10 * 60 * 1000;
 
@@ -41,6 +41,11 @@ export const authorize = action({
       const credentials = await loadCentralVapiCredentials();
       if (!credentials) throw new Error("central credentials unavailable");
       const cfg = readVoiceBudgetConfig(process.env);
+      // Free-demo tokens use the same browser origin allowlist as paid calls.
+      // Do not bypass the production HTTPS requirement on this separate path.
+      if (!allowedOriginsAreSecure(process.env)) {
+        throw new Error("Secure widget origins are not configured");
+      }
       const now = Date.now();
       const expiresAt = Math.ceil((now + DEMO_TOKEN_TTL_MS) / 1000) * 1000;
       const { token } = await signVapiPublicToken({
