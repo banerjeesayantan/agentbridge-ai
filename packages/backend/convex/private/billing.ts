@@ -185,7 +185,17 @@ export const createCheckout = action({
       });
     }
 
-    const base = appUrl.replace(/\/+$/, "");
+    let base: string;
+
+    try {
+      // APP_URL may include a path such as /dashboard; redirects must use the app origin.
+      base = new URL(appUrl).origin;
+    } catch {
+      throw new ConvexError({
+        code: "CONFIG_MISSING",
+        message: "APP_URL must be a valid absolute URL.",
+      });
+    }
 
     try {
       const checkout = await polarRequest<{ url: string }>("/v1/checkouts/", {
