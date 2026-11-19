@@ -205,7 +205,7 @@ export const createCheckout = action({
            * This redirect does NOT grant the subscription.
            * The Polar webhook does that.
            */
-          successUrl: `${base}/billing?checkout=success`,
+          successUrl: `${base}/?checkout=success`,
 
           /*
            * User returns after successful checkout.
@@ -213,7 +213,7 @@ export const createCheckout = action({
            * Subscription activation is handled by the Polar webhook.
            */
 
-          returnUrl: `${base}/billing?checkout=cancelled`,
+          returnUrl: `${base}/?checkout=cancelled`,
 
           /*
            * User clicks Back or cancels checkout.
