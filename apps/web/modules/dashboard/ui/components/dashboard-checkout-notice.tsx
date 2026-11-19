@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@workspace/ui/components/alert";
 import { SparklesIcon } from "lucide-react";
+import Link from "next/link";
+import { Button } from "@workspace/ui/components/button";
 
 export function DashboardCheckoutNotice() {
   const [status, setStatus] = useState<"success" | "cancelled" | null>(null);
@@ -35,9 +37,9 @@ export function DashboardCheckoutNotice() {
       <AlertTitle>Checkout completed — confirming your subscription</AlertTitle>
       <AlertDescription>
         Polar is confirming your subscription. Paid features become available
-        after the verified webhook updates your organization. You can continue
-        using your dashboard in the meantime.
+        after the verified webhook updates your organization.
       </AlertDescription>
+      <Button asChild className="mt-3"><Link href="/">Return to Dashboard</Link></Button>
     </Alert>
   ) : (
     <Alert className="mx-4 mt-4">
@@ -46,6 +48,7 @@ export function DashboardCheckoutNotice() {
         No new subscription was activated. Your current plan is unchanged, and
         you can return to billing whenever you are ready.
       </AlertDescription>
+      <Button asChild variant="outline" className="mt-3"><Link href="/">Return to Dashboard</Link></Button>
     </Alert>
   );
 }
