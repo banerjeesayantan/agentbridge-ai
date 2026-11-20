@@ -6,6 +6,8 @@ type Position = 'bottom-right' | 'bottom-left';
 interface WidgetConfig {
   organizationId?: string;
   position?: Position;
+  // Only supplied by the authenticated Playground preview flow.
+  installToken?: string;
 }
 
 interface WidgetState {
@@ -53,6 +55,7 @@ const HIDE_ANIMATION_MS = 300;
   let renderGeneration = 0;
 
   let organizationId: string | null = null;
+  let installToken: string | null = null;
   let position: Position = EMBED_CONFIG.DEFAULT_POSITION;
 
   const reduceMotion =
@@ -153,15 +156,19 @@ const HIDE_ANIMATION_MS = 300;
       `;
 
       nextIframe.title = 'Support chat';
-      if (!EMBED_CONFIG.BOOTSTRAP_URL) throw new Error("VITE_WIDGET_BOOTSTRAP_URL is not configured.");
-      const bootstrapUrl = new URL(EMBED_CONFIG.BOOTSTRAP_URL);
-      bootstrapUrl.searchParams.set("organizationId", orgId);
-      const response = await fetch(bootstrapUrl.toString(), { method: "GET", mode: "cors", credentials: "omit", cache: "no-store" });
-      if (!response.ok) throw new Error(await response.text());
-      const authorization = await response.json() as { token?: string };
-      if (!authorization.token) throw new Error("Widget authorization response was invalid.");
+      let token = installToken;
+      if (!token) {
+        if (!EMBED_CONFIG.BOOTSTRAP_URL) throw new Error("VITE_WIDGET_BOOTSTRAP_URL is not configured.");
+        const bootstrapUrl = new URL(EMBED_CONFIG.BOOTSTRAP_URL);
+        bootstrapUrl.searchParams.set("organizationId", orgId);
+        const response = await fetch(bootstrapUrl.toString(), { method: "GET", mode: "cors", credentials: "omit", cache: "no-store" });
+        if (!response.ok) throw new Error(await response.text());
+        const authorization = await response.json() as { token?: string };
+        token = authorization.token ?? null;
+      }
+      if (!token) throw new Error("Widget authorization response was invalid.");
       if (generation !== renderGeneration) return;
-      nextIframe.src = buildWidgetUrl(orgId, authorization.token);
+      nextIframe.src = buildWidgetUrl(orgId, token);
       nextIframe.style.cssText = `
         width: 100%;
         height: 100%;
@@ -278,6 +285,7 @@ const HIDE_ANIMATION_MS = 300;
     container = null;
     iframe = null;
     button = null;
+    installToken = null;
     isOpen = false;
   }
 
@@ -290,6 +298,8 @@ const HIDE_ANIMATION_MS = 300;
   function init(config?: WidgetConfig): boolean {
     const nextOrgId = config?.organizationId ?? organizationId;
     const nextPosition = config?.position ?? position;
+    const nextInstallToken =
+      config?.installToken ?? (nextOrgId === organizationId ? installToken : null);
 
     if (!isValidOrganizationId(nextOrgId)) {
       console.error(
@@ -302,13 +312,19 @@ const HIDE_ANIMATION_MS = 300;
       return false;
     }
 
-    if (isMounted() && nextOrgId === organizationId && nextPosition === position) {
+    if (
+      isMounted() &&
+      nextOrgId === organizationId &&
+      nextPosition === position &&
+      nextInstallToken === installToken
+    ) {
       return true;
     }
 
     const wasOpen = isOpen;
     destroy();
     organizationId = nextOrgId;
+    installToken = nextInstallToken;
     position = nextPosition;
 
     try {
