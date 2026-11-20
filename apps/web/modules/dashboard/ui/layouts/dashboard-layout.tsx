@@ -1,3 +1,4 @@
+import { DesktopOnlyGate } from "@/modules/dashboard/ui/components/desktop-only-gate";
 import { AuthGuard } from "@/modules/auth/ui/components/auth-guard";
 import { OrganizationGuard } from "@/modules/auth/ui/components/organization-guard";
 import { DashboardSidebar } from "@/modules/dashboard/ui/components/dashboard-sidebar";
@@ -17,7 +18,8 @@ export const DashboardLayout = async ({
   const defaultOpen = cookieStore.get("sidebar_state")?.value === "true";
 
   return (
-    <AuthGuard>
+    <DesktopOnlyGate>
+      <AuthGuard>
       <OrganizationGuard>
         <Provider>
           <SidebarProvider defaultOpen={defaultOpen}>
@@ -37,6 +39,7 @@ export const DashboardLayout = async ({
           </SidebarProvider>
         </Provider>
       </OrganizationGuard>
-    </AuthGuard>
+      </AuthGuard>
+    </DesktopOnlyGate>
   );
 };
