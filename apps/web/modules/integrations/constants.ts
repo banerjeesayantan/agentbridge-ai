@@ -30,6 +30,9 @@ export const EMBED_SCRIPT_URL =
   process.env.NEXT_PUBLIC_EMBED_SCRIPT_URL ||
   "https://agentbridge-ai-seven.vercel.app/widget.js";
 
+// The Playground preview uses the same embed bundle as customer installations.
+export const PLAYGROUND_EMBED_SCRIPT_URL = EMBED_SCRIPT_URL;
+
 export const HTML_SCRIPT = `<script
   src="{{SCRIPT_URL}}"
   data-organization-id="{{ORGANIZATION_ID}}"
