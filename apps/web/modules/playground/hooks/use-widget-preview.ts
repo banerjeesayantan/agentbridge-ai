@@ -1,6 +1,6 @@
 "use client";
 
-import { EMBED_SCRIPT_URL } from "@/modules/integrations/constants";
+import { PLAYGROUND_EMBED_SCRIPT_URL } from "@/modules/integrations/constants";
 import type { WidgetPosition } from "@/modules/integrations/utils";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -32,7 +32,7 @@ export interface LogEntry {
 export type LastAction = "none" | "init" | "show" | "hide" | "destroy";
 
 interface WidgetApi {
-  init: (config?: { organizationId?: string; position?: WidgetPosition }) => boolean | void;
+  init: (config?: { organizationId?: string; position?: WidgetPosition; installToken?: string }) => boolean | void;
   show: () => void;
   hide: () => void;
   destroy: () => void;
@@ -69,6 +69,7 @@ export function useWidgetPreview() {
 
   const [frameKey, setFrameKey] = useState(0);
   const [bundleStatus, setBundleStatus] = useState<BundleStatus>("loading");
+  const [isInitializing, setIsInitializing] = useState(false);
   const [widgetState, setWidgetState] = useState<WidgetState | null>(null);
   const [lastAction, setLastAction] = useState<LastAction>("none");
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -119,7 +120,9 @@ for (const level of ["warn", "error"] as const) {
 }
     setBundleStatus("loading");
     const script = doc.createElement("script");
-    script.src = EMBED_SCRIPT_URL;
+    const bundleStartedAt = performance.now();
+    const scriptUrl = new URL(PLAYGROUND_EMBED_SCRIPT_URL, window.location.origin).toString();
+    script.src = scriptUrl;
     script.async = true;
     script.onload = () => {
       const api = getApi();
@@ -136,12 +139,12 @@ for (const level of ["warn", "error"] as const) {
       if (typeof api.getState !== "function") {
         log("warn", "Bundle has no getState(); lifecycle badges cannot be verified. Rebuild apps/embed.");
       }
-      log("success", "Widget bundle loaded.");
+      log("success", `Widget bundle loaded in ${Math.round(performance.now() - bundleStartedAt)} ms.`);
       sync();
     };
     script.onerror = () => {
       setBundleStatus("error");
-      log("error", `Could not load the widget bundle from ${new URL(EMBED_SCRIPT_URL, window.location.href).host}. Check the URL, network and CSP.`);
+      log("error", `Could not load the widget bundle from ${new URL(scriptUrl).host}${new URL(scriptUrl).pathname}. Check the route, network and CSP.`);
     };
     doc.body.appendChild(script);
   }, [getApi, log, sync]);
@@ -165,29 +168,64 @@ for (const level of ["warn", "error"] as const) {
       const api = getApi();
       if (!api) {
         log("error", `${name}() unavailable: the widget bundle is not ready.`);
-        return;
+        return false;
       }
       try {
         fn(api);
+        return true;
       } catch (error) {
         log("error", `${name}() threw: ${error instanceof Error ? error.message : String(error)}`);
+        return false;
       }
     },
     [getApi, log],
   );
 
   const init = useCallback(
-    (organizationId: string, position: WidgetPosition) => {
+    (organizationId: string, position: WidgetPosition, installToken?: string) => {
       setLastAction("init");
-      withApi("init", (api) => {
-        const result = api.init({ organizationId, position });
-        const state = sync();
-        if (result === false || (state && !state.initialized)) {
-          log("error", "init() rejected the configuration. See the preview errors above.");
-        } else {
-          log("success", `Initialized (position: ${position}).`);
+      setIsInitializing(true);
+      const called = withApi("init", (api) => {
+        // The embed's init() starts an asynchronous bootstrap request and
+        // returns before its launcher/iframe is mounted. Do not treat the
+        // immediate getState() result as an initialization failure.
+        const initializationStartedAt = performance.now();
+        const result = api.init({ organizationId, position, installToken });
+        if (result === false) {
+          setIsInitializing(false);
+          sync();
+          log("error", `init() rejected the configuration after ${Math.round(performance.now() - initializationStartedAt)} ms. Check the organization ID and position.`);
+          return;
         }
+
+        if (typeof api.getState !== "function") {
+          setIsInitializing(false);
+          log("info", "Initialization requested. This widget bundle does not expose getState() for verification.");
+          return;
+        }
+
+        log("info", "Initialization accepted. Waiting for widget authorization and mount…");
+        void (async () => {
+          const deadline = Date.now() + 10_000;
+          while (Date.now() < deadline) {
+            await new Promise((resolve) => window.setTimeout(resolve, 250));
+            const state = sync();
+            if (state?.initialized && state.organizationId === organizationId) {
+              setIsInitializing(false);
+              log("success", `Initialized in ${Math.round(performance.now() - initializationStartedAt)} ms (position: ${position}).`);
+              return;
+            }
+          }
+
+          setIsInitializing(false);
+          sync();
+          log(
+            "error",
+            "Widget did not mount within 10 seconds. Check the preview errors above; common causes are a rejected /widget/bootstrap request, an origin missing from the organization's allowlist, or a missing WIDGET_INSTALLATION_SECRET.",
+          );
+        })();
       });
+      if (!called) setIsInitializing(false);
     },
     [log, sync, withApi],
   );
@@ -212,6 +250,7 @@ for (const level of ["warn", "error"] as const) {
 
   const destroy = useCallback(() => {
     setLastAction("destroy");
+    setIsInitializing(false);
     withApi("destroy", (api) => {
       api.destroy();
       sync();
@@ -237,6 +276,7 @@ for (const level of ["warn", "error"] as const) {
     stateRef.current = null;
     setWidgetState(null);
     setLastAction("none");
+    setIsInitializing(false);
     setBundleStatus("loading");
     log("info", "Reloading preview.");
     setFrameKey((k) => k + 1);
@@ -249,6 +289,7 @@ for (const level of ["warn", "error"] as const) {
     frameKey,
     handleFrameLoad,
     bundleStatus,
+    isInitializing,
     widgetState,
     lastAction,
     supportsState,
