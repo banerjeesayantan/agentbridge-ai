@@ -18,7 +18,6 @@ import {
   SelectValue,
 } from "@workspace/ui/components/select";
 import { Separator } from "@workspace/ui/components/separator";
-import { SidebarTrigger } from "@workspace/ui/components/sidebar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs";
 import { ToggleGroup, ToggleGroupItem } from "@workspace/ui/components/toggle-group";
 import { cn } from "@workspace/ui/lib/utils";
@@ -176,9 +175,7 @@ export const PlaygroundView = () => {
   return (
     <div className="flex min-h-svh w-full min-w-0 max-w-full flex-col overflow-x-hidden bg-muted xl:h-svh xl:overflow-hidden">
       <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-b bg-background px-3 py-2 sm:px-4">
-        <SidebarTrigger aria-label="Toggle sidebar" />
-        <Separator className="h-5" orientation="vertical" />
-        <h1 className="font-semibold text-base">Playground</h1>
+        <h1 className="font-semibold text-base">Widget preview</h1>
         <div aria-live="polite" className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
           <StatusBadge tone={bundle.tone}>{bundle.text}</StatusBadge>
           {widgetBadge && <StatusBadge tone={widgetBadge.tone}>{widgetBadge.text}</StatusBadge>}
