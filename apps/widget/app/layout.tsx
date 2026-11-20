@@ -24,7 +24,7 @@ export default function RootLayout({
         className={`${fontSans.variable} ${fontMono.variable} font-sans antialiased `}
       >
         <Providers>
-          <div className="w-screen h-screen">
+          <div className="h-dvh w-full min-w-0 overflow-hidden">
             {children}
           </div>
         </Providers>
