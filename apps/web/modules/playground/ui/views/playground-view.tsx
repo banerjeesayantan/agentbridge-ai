@@ -135,31 +135,31 @@ export const PlaygroundView = () => {
         </div>
       </header>
 
-      <div className="grid min-w-0 flex-1 gap-4 p-3 sm:p-4 xl:min-h-0 xl:grid-cols-[minmax(0,1fr)_minmax(360px,400px)]">
+      <div className="grid min-w-0 flex-1 grid-cols-1 gap-4 p-3 sm:p-4 2xl:min-h-0 2xl:grid-cols-[minmax(0,1fr)_minmax(360px,400px)]">
         {/* Preview canvas */}
-        <Card className="min-h-[520px] min-w-0 gap-0 py-0 xl:min-h-0">
-          <CardHeader className="flex flex-row flex-wrap items-center gap-2 border-b px-4 py-3">
-            <div className="flex flex-wrap items-center gap-2" role="toolbar" aria-label="Widget lifecycle">
-              <Button disabled={!canInit} onClick={() => actions.init(orgId, position)} size="sm" type="button">
+        <Card className="flex min-h-[520px] min-w-0 flex-col gap-0 overflow-hidden py-0 2xl:min-h-0">
+          <CardHeader className="flex flex-col items-stretch gap-3 border-b px-4 py-3 sm:flex-row sm:items-center">
+            <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:w-auto" role="toolbar" aria-label="Widget lifecycle">
+              <Button className="shrink-0" disabled={!canInit} onClick={() => actions.init(orgId, position)} size="sm" type="button">
                 <PlayIcon />
                 Initialize
               </Button>
-              <Button disabled={!canShow} onClick={actions.show} size="sm" type="button" variant="outline">
+              <Button className="shrink-0" disabled={!canShow} onClick={actions.show} size="sm" type="button" variant="outline">
                 <EyeIcon />
                 Show
               </Button>
-              <Button disabled={!canHide} onClick={actions.hide} size="sm" type="button" variant="outline">
+              <Button className="shrink-0" disabled={!canHide} onClick={actions.hide} size="sm" type="button" variant="outline">
                 <EyeOffIcon />
                 Hide
               </Button>
-              <Button disabled={!canDestroy} onClick={actions.destroy} size="sm" type="button" variant="outline">
+              <Button className="shrink-0" disabled={!canDestroy} onClick={actions.destroy} size="sm" type="button" variant="outline">
                 <Trash2Icon />
                 Destroy
               </Button>
             </div>
             <ToggleGroup
               aria-label="Preview size"
-              className="ml-auto"
+              className="ml-0 shrink-0 self-start sm:ml-auto sm:self-auto"
               onValueChange={(value) => value && setDevice(value as "desktop" | "mobile")}
               type="single"
               value={device}
@@ -199,15 +199,15 @@ export const PlaygroundView = () => {
             </div>
           )}
 
-          <CardContent className="flex min-h-0 flex-1 items-stretch justify-center p-4">
+          <CardContent className="flex min-h-[420px] min-w-0 flex-1 items-stretch justify-center overflow-hidden p-3 sm:p-4">
             <div
               className={cn(
-                "w-full overflow-hidden border bg-white shadow-sm transition-[max-width] duration-200",
+                "h-[min(70vh,720px)] min-h-[420px] w-full min-w-0 overflow-hidden border bg-white shadow-sm transition-[max-width] duration-200",
                 device === "mobile" ? "max-w-[375px] rounded-[1.75rem] border-4 border-foreground/80" : "rounded-lg",
               )}
             >
               <iframe
-                className="size-full min-h-[420px] bg-white"
+                className="block size-full min-h-[420px] w-full border-0 bg-white"
                 key={preview.frameKey}
                 onLoad={preview.handleFrameLoad}
                 ref={preview.iframeRef}

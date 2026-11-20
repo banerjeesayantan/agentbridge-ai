@@ -1,3 +1,4 @@
+
 export const INTEGRATIONS = [
   {
     id: "html",
@@ -23,12 +24,10 @@ export const INTEGRATIONS = [
 
 export type IntegrationId = (typeof INTEGRATIONS)[number]["id"];
 
-// Where the embeddable bundle (widget.js) is served from. Override per
-// environment with NEXT_PUBLIC_EMBED_SCRIPT_URL; the default keeps the
-// previously hard-coded deployment so existing snippets do not change.
+// Where the embeddable bundle (widget.js) is served from.
 export const EMBED_SCRIPT_URL =
   process.env.NEXT_PUBLIC_EMBED_SCRIPT_URL ||
-  "https://next15-echo-widget.vercel.app/widget.js";
+  "https://agentbridge-ai-git-main-banerjeesayantans-projects.vercel.app/widget.js";
 
 export const HTML_SCRIPT = `<script
   src="{{SCRIPT_URL}}"
