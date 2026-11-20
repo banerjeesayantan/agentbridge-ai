@@ -28,7 +28,11 @@
       "destination": { "service": "widget" }
     },
     {
-      "source": "/:path*",
+      "source": "/",
+      "destination": { "service": "web" }
+    },
+    {
+      "source": "/(.*)",
       "destination": { "service": "web" }
     }
   ]
