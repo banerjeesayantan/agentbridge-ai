@@ -128,6 +128,7 @@ export const getMany = query({
   },
 
   handler: async (ctx, args) => {
+    const queryStartedAt = Date.now();
     const identity = await ctx.auth.getUserIdentity();
 
     if (identity === null) {
