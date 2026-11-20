@@ -45,6 +45,7 @@ import type * as lib_polarMapping from "../lib/polarMapping.js";
 import type * as lib_rateLimit from "../lib/rateLimit.js";
 import type * as lib_secrets from "../lib/secrets.js";
 import type * as lib_standardWebhooks from "../lib/standardWebhooks.js";
+import type * as lib_widgetOrigin from "../lib/widgetOrigin.js";
 import type * as playground from "../playground.js";
 import type * as private_billing from "../private/billing.js";
 import type * as private_contactSessions from "../private/contactSessions.js";
@@ -62,7 +63,6 @@ import type * as public_conversations from "../public/conversations.js";
 import type * as public_feedback from "../public/feedback.js";
 import type * as public_messages from "../public/messages.js";
 import type * as public_organizations from "../public/organizations.js";
-import type * as public_secrets from "../public/secrets.js";
 import type * as public_widgetSettings from "../public/widgetSettings.js";
 import type * as system_ai_agents_supportAgent from "../system/ai/agents/supportAgent.js";
 import type * as system_ai_constants from "../system/ai/constants.js";
@@ -131,6 +131,7 @@ declare const fullApi: ApiFromModules<{
   "lib/rateLimit": typeof lib_rateLimit;
   "lib/secrets": typeof lib_secrets;
   "lib/standardWebhooks": typeof lib_standardWebhooks;
+  "lib/widgetOrigin": typeof lib_widgetOrigin;
   playground: typeof playground;
   "private/billing": typeof private_billing;
   "private/contactSessions": typeof private_contactSessions;
@@ -148,7 +149,6 @@ declare const fullApi: ApiFromModules<{
   "public/feedback": typeof public_feedback;
   "public/messages": typeof public_messages;
   "public/organizations": typeof public_organizations;
-  "public/secrets": typeof public_secrets;
   "public/widgetSettings": typeof public_widgetSettings;
   "system/ai/agents/supportAgent": typeof system_ai_agents_supportAgent;
   "system/ai/constants": typeof system_ai_constants;
@@ -307,7 +307,16 @@ export declare const components: {
           agentName?: string;
           embeddings?: {
             dimension:
-              128 | 256 | 512 | 768 | 1024 | 1408 | 1536 | 2048 | 3072 | 4096;
+              | 128
+              | 256
+              | 512
+              | 768
+              | 1024
+              | 1408
+              | 1536
+              | 2048
+              | 3072
+              | 4096;
             model: string;
             vectors: Array<Array<number> | null>;
           };
@@ -1989,7 +1998,16 @@ export declare const components: {
             model: string;
             threadId: string;
             vectorDimension:
-              128 | 256 | 512 | 768 | 1024 | 1408 | 1536 | 2048 | 3072 | 4096;
+              | 128
+              | 256
+              | 512
+              | 768
+              | 1024
+              | 1408
+              | 1536
+              | 2048
+              | 3072
+              | 4096;
           },
           { continueCursor: string; isDone: boolean }
         >;
@@ -1998,7 +2016,16 @@ export declare const components: {
           "internal",
           {
             vectorDimension:
-              128 | 256 | 512 | 768 | 1024 | 1408 | 1536 | 2048 | 3072 | 4096;
+              | 128
+              | 256
+              | 512
+              | 768
+              | 1024
+              | 1408
+              | 1536
+              | 2048
+              | 3072
+              | 4096;
             vectors: Array<{
               messageId?: string;
               model: string;
@@ -2030,7 +2057,16 @@ export declare const components: {
             table?: string;
             targetModel: string;
             vectorDimension:
-              128 | 256 | 512 | 768 | 1024 | 1408 | 1536 | 2048 | 3072 | 4096;
+              | 128
+              | 256
+              | 512
+              | 768
+              | 1024
+              | 1408
+              | 1536
+              | 2048
+              | 3072
+              | 4096;
           },
           {
             continueCursor: string;

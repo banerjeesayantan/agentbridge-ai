@@ -181,3 +181,113 @@
     font-weight: 500;
   }
 }
+
+
+/* Responsive workspace foundations: laptop, desktop and tablet */
+html,
+body {
+  width: 100%;
+  min-width: 0;
+}
+
+body {
+  overflow-x: clip;
+}
+
+.desktop-app-content,
+[data-slot="sidebar-wrapper"],
+[data-slot="sidebar-inset"] {
+  min-width: 0;
+  width: 100%;
+}
+
+/* Keep app content hidden until device detection runs to avoid a mobile flash. */
+html:not(.device-detection-complete) .desktop-app-content {
+  visibility: hidden;
+}
+
+.mobile-access-notice {
+  display: none;
+}
+
+.mobile-access-card {
+  width: min(100%, 30rem);
+  padding: clamp(1.5rem, 5vw, 2.75rem);
+  border: 1px solid var(--border);
+  border-radius: 1.25rem;
+  background: var(--card);
+  color: var(--card-foreground);
+  box-shadow: 0 24px 80px rgb(0 0 0 / 0.12);
+  text-align: center;
+}
+
+.mobile-access-icon {
+  display: grid;
+  width: 3.5rem;
+  height: 3.5rem;
+  margin: 0 auto 1.5rem;
+  place-items: center;
+  border-radius: 1rem;
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.mobile-access-icon svg {
+  width: 1.75rem;
+  height: 1.75rem;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.mobile-access-brand {
+  margin: 0 0 0.5rem;
+  color: var(--primary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.mobile-access-card h1 {
+  margin: 0;
+  font-size: clamp(1.5rem, 5vw, 2rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+}
+
+.mobile-access-card > p:last-child {
+  margin: 1rem 0 0;
+  color: var(--muted-foreground);
+  font-size: 0.95rem;
+  line-height: 1.65;
+}
+
+html.is-mobile-device,
+html.is-mobile-device body {
+  min-height: 100%;
+  overflow: hidden;
+}
+
+html.is-mobile-device .desktop-app-content {
+  display: none !important;
+}
+
+html.is-mobile-device .mobile-access-notice {
+  display: grid;
+  min-height: 100svh;
+  width: 100%;
+  place-items: center;
+  padding: 1.25rem;
+  background:
+    radial-gradient(ellipse at top, color-mix(in oklch, var(--primary) 12%, transparent), transparent 55%),
+    var(--background);
+}
+
+@media (max-width: 1023px) {
+  [data-slot="sidebar-inset"] {
+    min-width: 0;
+  }
+}

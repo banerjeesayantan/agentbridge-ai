@@ -278,7 +278,7 @@ const HIDE_ANIMATION_MS = 300;
    * rebuilds the widget so there is never more than one on the page.
    */
   function init(config?: WidgetConfig): boolean {
-    const nextOrgId = config?.organizationId ?? organizationId;
+    const nextOrgId = config?.organizationId ?? organizationId ?? EMBED_CONFIG.DEFAULT_ORG_ID;
     const nextPosition = config?.position ?? position;
 
     if (!isValidOrganizationId(nextOrgId)) {
