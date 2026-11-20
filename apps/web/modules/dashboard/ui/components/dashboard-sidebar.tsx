@@ -1,6 +1,7 @@
 "use client";
 
 import { useOrganization } from "@clerk/nextjs";
+import { useState } from "react";
 import {
   CreditCardIcon,
   FlaskConicalIcon,
@@ -95,6 +96,7 @@ const navigationGroups = [
 
 const OrganizationFooter = () => {
   const { organization, membership, isLoaded } = useOrganization();
+  const [imageFailed, setImageFailed] = useState(false);
 
   if (!isLoaded || !organization) {
     return null;
@@ -110,10 +112,12 @@ const OrganizationFooter = () => {
 
   return (
   <div className="flex min-w-0 items-center gap-3 rounded-lg px-2 py-3 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
-  {organization.imageUrl ? (
+  {organization.imageUrl && !imageFailed ? (
     <Image
       src={organization.imageUrl}
-      alt={`${organization.name} logo`}
+      alt=""
+      aria-hidden="true"
+      onError={() => setImageFailed(true)}
       width={36}
       height={36}
       unoptimized
@@ -126,7 +130,7 @@ const OrganizationFooter = () => {
   )}
 
       <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
-        <p className="truncate text-sm font-semibold">
+        <p className="truncate text-sm font-semibold" title={organization.name}>
           {organization.name}
         </p>
         <p className="truncate text-xs capitalize text-muted-foreground">
@@ -150,9 +154,9 @@ export const DashboardSidebar = () => {
 
   return (
     <Sidebar className="group" collapsible="icon">
-      <SidebarHeader />
+      <SidebarHeader className="min-h-3 p-0" />
 
-      <SidebarContent className="flex-1 pt-11">
+      <SidebarContent className="flex-1 pt-3">
         {navigationGroups.map((group) => (
           <SidebarGroup key={group.title}>
             <SidebarGroupLabel>{group.title}</SidebarGroupLabel>

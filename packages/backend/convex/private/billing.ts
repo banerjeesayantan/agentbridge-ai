@@ -226,14 +226,14 @@ export const createCheckout = action({
              * The Polar webhook does that.
              */
             successUrl:
-              `${base}/billing?checkout=success`,
+              `${base}/?checkout=success`,
 
             /*
              * User cancels checkout:
              * return them to dashboard without changing plan.
              */
             returnUrl:
-              `${base}/billing?checkout=cancelled`,
+              `${base}/?checkout=cancelled`,
           }),
         },
       );
