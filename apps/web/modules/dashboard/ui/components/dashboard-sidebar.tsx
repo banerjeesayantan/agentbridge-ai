@@ -61,20 +61,7 @@ export const DashboardSidebar = () => {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="border-b border-sidebar-border px-3 py-3">
-        <Link href="/" aria-label="AgentBridge dashboard" className="flex min-w-0 items-center gap-2 group-data-[collapsible=icon]:justify-center">
-          <Image
-            src="/AgentBridge_logo.png"
-            alt=""
-            width={32}
-            height={32}
-            priority
-            className="size-8 shrink-0 object-contain"
-          />
-          <span className="truncate text-sm font-semibold tracking-tight group-data-[collapsible=icon]:hidden">
-            AgentBridge
-          </span>
-        </Link>
+      <SidebarHeader className="h-2 shrink-0 p-0">
       </SidebarHeader>
 
       <SidebarContent className="min-h-0 flex-1 pt-2">
@@ -117,11 +104,11 @@ export const DashboardSidebar = () => {
           appearance={{
             elements: {
               rootBox: "w-full min-w-0",
-              organizationSwitcherTrigger: "w-full min-w-0 justify-start rounded-md px-2 py-2 text-sm hover:bg-sidebar-accent",
+              organizationSwitcherTrigger: "w-full min-w-0 justify-start rounded-md px-2 py-2 text-sm hover:bg-sidebar-accent group-data-[collapsible=icon]:size-9 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0",
               organizationPreview: "min-w-0",
-              organizationPreviewTextContainer: "min-w-0",
-              organizationPreviewMainIdentifier: "max-w-[9rem] truncate text-xs font-medium",
-              organizationPreviewSecondaryIdentifier: "text-[11px]",
+              organizationPreviewTextContainer: "min-w-0 group-data-[collapsible=icon]:hidden",
+              organizationPreviewMainIdentifier: "max-w-[9rem] truncate text-xs font-medium group-data-[collapsible=icon]:hidden",
+              organizationPreviewSecondaryIdentifier: "text-[11px] group-data-[collapsible=icon]:hidden",
               avatarBox: "size-8 shrink-0",
               userPreview: "min-w-0",
             },
