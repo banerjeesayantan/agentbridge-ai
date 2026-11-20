@@ -385,7 +385,7 @@ export const PricingTable = () => {
                         className="w-full transition-all group-hover:shadow-md"
                         variant="outline"
                         onClick={() =>
-                          window.location.assign("/dashboard")
+                          window.location.assign("/")
                         }
                       >
                         Continue with Free
