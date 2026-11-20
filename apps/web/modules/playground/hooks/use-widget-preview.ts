@@ -69,6 +69,7 @@ export function useWidgetPreview() {
 
   const [frameKey, setFrameKey] = useState(0);
   const [bundleStatus, setBundleStatus] = useState<BundleStatus>("loading");
+  const [isInitializing, setIsInitializing] = useState(false);
   const [widgetState, setWidgetState] = useState<WidgetState | null>(null);
   const [lastAction, setLastAction] = useState<LastAction>("none");
   const [logs, setLogs] = useState<LogEntry[]>([]);
@@ -166,12 +167,14 @@ for (const level of ["warn", "error"] as const) {
       const api = getApi();
       if (!api) {
         log("error", `${name}() unavailable: the widget bundle is not ready.`);
-        return;
+        return false;
       }
       try {
         fn(api);
+        return true;
       } catch (error) {
         log("error", `${name}() threw: ${error instanceof Error ? error.message : String(error)}`);
+        return false;
       }
     },
     [getApi, log],
@@ -180,18 +183,21 @@ for (const level of ["warn", "error"] as const) {
   const init = useCallback(
     (organizationId: string, position: WidgetPosition) => {
       setLastAction("init");
-      withApi("init", (api) => {
+      setIsInitializing(true);
+      const called = withApi("init", (api) => {
         // The embed's init() starts an asynchronous bootstrap request and
         // returns before its launcher/iframe is mounted. Do not treat the
         // immediate getState() result as an initialization failure.
         const result = api.init({ organizationId, position });
         if (result === false) {
+          setIsInitializing(false);
           sync();
           log("error", "init() rejected the configuration before mounting. Check the organization ID and position.");
           return;
         }
 
         if (typeof api.getState !== "function") {
+          setIsInitializing(false);
           log("info", "Initialization requested. This widget bundle does not expose getState() for verification.");
           return;
         }
@@ -203,11 +209,13 @@ for (const level of ["warn", "error"] as const) {
             await new Promise((resolve) => window.setTimeout(resolve, 250));
             const state = sync();
             if (state?.initialized && state.organizationId === organizationId) {
+              setIsInitializing(false);
               log("success", `Initialized (position: ${position}).`);
               return;
             }
           }
 
+          setIsInitializing(false);
           sync();
           log(
             "error",
@@ -215,6 +223,7 @@ for (const level of ["warn", "error"] as const) {
           );
         })();
       });
+      if (!called) setIsInitializing(false);
     },
     [log, sync, withApi],
   );
@@ -239,6 +248,7 @@ for (const level of ["warn", "error"] as const) {
 
   const destroy = useCallback(() => {
     setLastAction("destroy");
+    setIsInitializing(false);
     withApi("destroy", (api) => {
       api.destroy();
       sync();
@@ -264,6 +274,7 @@ for (const level of ["warn", "error"] as const) {
     stateRef.current = null;
     setWidgetState(null);
     setLastAction("none");
+    setIsInitializing(false);
     setBundleStatus("loading");
     log("info", "Reloading preview.");
     setFrameKey((k) => k + 1);
@@ -276,6 +287,7 @@ for (const level of ["warn", "error"] as const) {
     frameKey,
     handleFrameLoad,
     bundleStatus,
+    isInitializing,
     widgetState,
     lastAction,
     supportsState,
