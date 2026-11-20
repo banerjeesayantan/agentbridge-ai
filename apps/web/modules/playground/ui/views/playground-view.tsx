@@ -124,7 +124,7 @@ export const PlaygroundView = () => {
   const snippet = createScript(framework, orgId || "YOUR_ORGANIZATION_ID", position);
 
   return (
-    <div className="flex min-h-svh flex-col bg-muted lg:h-svh lg:overflow-hidden">
+    <div className="flex min-h-svh flex-col bg-muted xl:h-svh xl:overflow-hidden">
       <header className="flex h-14 shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-b bg-background px-4 py-2">
         <SidebarTrigger aria-label="Toggle sidebar" />
         <Separator className="h-5" orientation="vertical" />
@@ -135,9 +135,9 @@ export const PlaygroundView = () => {
         </div>
       </header>
 
-      <div className="grid flex-1 gap-4 p-4 lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_400px]">
+      <div className="grid flex-1 gap-4 p-4 xl:min-h-0 xl:grid-cols-[minmax(0,1fr)_minmax(320px,360px)]">
         {/* Preview canvas */}
-        <Card className="min-h-[520px] gap-0 py-0 lg:min-h-0">
+        <Card className="min-h-[520px] gap-0 py-0 xl:min-h-0">
           <CardHeader className="flex flex-row flex-wrap items-center gap-2 border-b px-4 py-3">
             <div className="flex flex-wrap items-center gap-2" role="toolbar" aria-label="Widget lifecycle">
               <Button disabled={!canInit} onClick={() => actions.init(orgId, position)} size="sm" type="button">
@@ -219,7 +219,7 @@ export const PlaygroundView = () => {
         </Card>
 
         {/* Configure / Install / Diagnostics */}
-        <Card className="min-h-[520px] gap-0 py-0 lg:min-h-0">
+        <Card className="min-h-[520px] gap-0 py-0 xl:min-h-0">
           <Tabs className="flex min-h-0 flex-1 flex-col gap-0" defaultValue="configure">
             <div className="border-b p-3">
               <TabsList className="grid w-full grid-cols-3">
