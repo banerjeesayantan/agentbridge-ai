@@ -1,4 +1,5 @@
 "use client";
+
 import { useEffect } from "react";
 import { OrganizationSwitcher, useOrganization } from "@clerk/nextjs";
 import {
@@ -31,78 +32,34 @@ import {
 import { cn } from "@workspace/ui/lib/utils";
 
 const customerSupportItems = [
-  {
-    title: "Conversations",
-    url: "/conversations",
-    icon: InboxIcon,
-  },
-  {
-    title: "Feedback",
-    url: "/feedback",
-    icon: MessageSquareTextIcon,
-  },
-  {
-    title: "Knowledge Base",
-    url: "/files",
-    icon: LibraryBigIcon,
-  },
+  { title: "Conversations", url: "/conversations", icon: InboxIcon },
+  { title: "Feedback", url: "/feedback", icon: MessageSquareTextIcon },
+  { title: "Knowledge Base", url: "/files", icon: LibraryBigIcon },
 ];
 
 const configurationItems = [
-  {
-    title: "Playground",
-    url: "/",
-    icon: FlaskConicalIcon,
-  },
-  {
-    title: "Widget Customization",
-    url: "/customization",
-    icon: PaletteIcon,
-  },
-  {
-    title: "Integrations",
-    url: "/integrations",
-    icon: LayoutDashboardIcon,
-  },
-  {
-    title: "Voice Assistant",
-    url: "/plugins/vapi",
-    icon: Mic,
-  },
+  { title: "Playground", url: "/", icon: FlaskConicalIcon },
+  { title: "Widget Customization", url: "/customization", icon: PaletteIcon },
+  { title: "Integrations", url: "/integrations", icon: LayoutDashboardIcon },
+  { title: "Voice Assistant", url: "/plugins/vapi", icon: Mic },
 ];
 
 const accountItems = [
-  {
-    title: "Plans & Billing",
-    url: "/billing",
-    icon: CreditCardIcon,
-  },
+  { title: "Plans & Billing", url: "/billing", icon: CreditCardIcon },
 ];
 
 const navigationGroups = [
-  {
-    title: "Customer Support",
-    items: customerSupportItems,
-  },
-  {
-    title: "Configuration",
-    items: configurationItems,
-  },
-  {
-    title: "Account",
-    items: accountItems,
-  },
+  { title: "Customer Support", items: customerSupportItems },
+  { title: "Configuration", items: configurationItems },
+  { title: "Account", items: accountItems },
 ];
 
 const OrganizationFooter = () => {
   const { organization, membership, isLoaded } = useOrganization();
 
-  if (!isLoaded) {
-    return null;
-  }
+  if (!isLoaded) return null;
 
   const role = membership?.role?.replace(/^org:/, "").replace(/_/g, " ");
-
   const formattedRole = role
     ? role.charAt(0).toUpperCase() + role.slice(1)
     : "Member";
@@ -114,28 +71,32 @@ const OrganizationFooter = () => {
         afterSelectOrganizationUrl="/"
         hidePersonal
       />
+
       {organization && (
         <div className="flex min-w-0 items-center gap-3 rounded-lg px-1 py-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
-      {organization.imageUrl ? (
-        <Image
-          src={organization.imageUrl}
-          alt={`${organization.name} logo`}
-          width={36}
-          height={36}
-          unoptimized
-          className="size-9 shrink-0 rounded-lg object-cover"
-        />
-      ) : (
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-sidebar-accent text-sm font-semibold">
-          {organization.name.charAt(0).toUpperCase()}
-        </div>
-      )}
+          {organization.imageUrl ? (
+            <Image
+              src={organization.imageUrl}
+              alt={`${organization.name} logo`}
+              width={36}
+              height={36}
+              unoptimized
+              className="size-9 shrink-0 rounded-lg object-cover"
+            />
+          ) : (
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-sidebar-accent text-sm font-semibold">
+              {organization.name.charAt(0).toUpperCase()}
+            </div>
+          )}
 
-      <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
-        <p className="truncate text-sm font-semibold">{organization.name}</p>
-        <p className="truncate text-xs capitalize text-muted-foreground">
-          {formattedRole}
-        </p>
+          <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
+            <p className="truncate text-sm font-semibold">
+              {organization.name}
+            </p>
+            <p className="truncate text-xs capitalize text-muted-foreground">
+              {formattedRole}
+            </p>
+          </div>
         </div>
       )}
     </div>
@@ -151,10 +112,7 @@ export const DashboardSidebar = () => {
   }, [pathname, setOpenMobile]);
 
   const isActive = (url: string) => {
-    if (url === "/") {
-      return pathname === "/";
-    }
-
+    if (url === "/") return pathname === "/";
     return pathname === url || pathname.startsWith(`${url}/`);
   };
 
@@ -184,7 +142,6 @@ export const DashboardSidebar = () => {
         {navigationGroups.map((group) => (
           <SidebarGroup key={group.title}>
             <SidebarGroupLabel>{group.title}</SidebarGroupLabel>
-
             <SidebarGroupContent>
               <SidebarMenu>
                 {group.items.map((item) => {
