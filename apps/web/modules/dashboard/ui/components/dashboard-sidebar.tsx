@@ -1,6 +1,7 @@
 "use client";
+
 import { useEffect } from "react";
-import { useOrganization } from "@clerk/nextjs";
+import { OrganizationSwitcher, useOrganization } from "@clerk/nextjs";
 import {
   CreditCardIcon,
   FlaskConicalIcon,
@@ -31,105 +32,73 @@ import {
 import { cn } from "@workspace/ui/lib/utils";
 
 const customerSupportItems = [
-  {
-    title: "Conversations",
-    url: "/conversations",
-    icon: InboxIcon,
-  },
-  {
-    title: "Feedback",
-    url: "/feedback",
-    icon: MessageSquareTextIcon,
-  },
-  {
-    title: "Knowledge Base",
-    url: "/files",
-    icon: LibraryBigIcon,
-  },
+  { title: "Conversations", url: "/conversations", icon: InboxIcon },
+  { title: "Feedback", url: "/feedback", icon: MessageSquareTextIcon },
+  { title: "Knowledge Base", url: "/files", icon: LibraryBigIcon },
 ];
 
 const configurationItems = [
-  {
-    title: "Playground",
-    url: "/",
-    icon: FlaskConicalIcon,
-  },
-  {
-    title: "Widget Customization",
-    url: "/customization",
-    icon: PaletteIcon,
-  },
-  {
-    title: "Integrations",
-    url: "/integrations",
-    icon: LayoutDashboardIcon,
-  },
-  {
-    title: "Voice Assistant",
-    url: "/plugins/vapi",
-    icon: Mic,
-  },
+  { title: "Playground", url: "/", icon: FlaskConicalIcon },
+  { title: "Widget Customization", url: "/customization", icon: PaletteIcon },
+  { title: "Integrations", url: "/integrations", icon: LayoutDashboardIcon },
+  { title: "Voice Assistant", url: "/plugins/vapi", icon: Mic },
 ];
 
 const accountItems = [
-  {
-    title: "Plans & Billing",
-    url: "/billing",
-    icon: CreditCardIcon,
-  },
+  { title: "Plans & Billing", url: "/billing", icon: CreditCardIcon },
 ];
 
 const navigationGroups = [
-  {
-    title: "Customer Support",
-    items: customerSupportItems,
-  },
-  {
-    title: "Configuration",
-    items: configurationItems,
-  },
-  {
-    title: "Account",
-    items: accountItems,
-  },
+  { title: "Customer Support", items: customerSupportItems },
+  { title: "Configuration", items: configurationItems },
+  { title: "Account", items: accountItems },
 ];
 
 const OrganizationFooter = () => {
   const { organization, membership, isLoaded } = useOrganization();
 
-  if (!isLoaded || !organization) {
-    return null;
-  }
+  if (!isLoaded) return null;
 
   const role = membership?.role?.replace(/^org:/, "").replace(/_/g, " ");
-
   const formattedRole = role
     ? role.charAt(0).toUpperCase() + role.slice(1)
     : "Member";
 
   return (
-    <div className="flex min-w-0 items-center gap-3 rounded-lg px-2 py-3 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
-      {organization.imageUrl ? (
-        <Image
-          src={organization.imageUrl}
-          alt={`${organization.name} logo`}
-          width={36}
-          height={36}
-          unoptimized
-          className="size-9 shrink-0 rounded-lg object-cover"
-        />
-      ) : (
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-sidebar-accent text-sm font-semibold">
-          {organization.name.charAt(0).toUpperCase()}
+    <div className="flex min-w-0 flex-col gap-2 px-1 py-2">
+      <OrganizationSwitcher
+        afterCreateOrganizationUrl="/"
+        afterSelectOrganizationUrl="/"
+        hidePersonal
+      />
+
+      {organization && (
+        <div className="flex min-w-0 items-center gap-3 rounded-lg px-1 py-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+          {organization.imageUrl ? (
+            <Image
+              src={organization.imageUrl}
+              alt={`${organization.name} logo`}
+              width={36}
+              height={36}
+              unoptimized
+              className="size-9 shrink-0 rounded-lg object-cover"
+            />
+          ) : (
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-sidebar-accent text-sm font-semibold">
+              {organization.name.charAt(0).toUpperCase()}
+            </div>
+          )}
+
+          <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
+            <p className="truncate text-sm font-semibold">
+              {organization.name}
+            </p>
+            <p className="truncate text-xs capitalize text-muted-foreground">
+              {formattedRole}
+            </p>
+          </div>
         </div>
       )}
-
-      <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
-        <p className="truncate text-sm font-semibold">{organization.name}</p>
-        <p className="truncate text-xs capitalize text-muted-foreground">
-          {formattedRole}
-        </p>
-      </div>
     </div>
   );
 };
@@ -143,22 +112,36 @@ export const DashboardSidebar = () => {
   }, [pathname, setOpenMobile]);
 
   const isActive = (url: string) => {
-    if (url === "/") {
-      return pathname === "/";
-    }
-
+    if (url === "/") return pathname === "/";
     return pathname === url || pathname.startsWith(`${url}/`);
   };
 
   return (
     <Sidebar className="group" collapsible="icon">
-      <SidebarHeader />
+      <SidebarHeader className="px-3 py-3">
+        <Link
+          href="/"
+          aria-label="AgentBridge AI home"
+          className="flex min-w-0 items-center gap-2 group-data-[collapsible=icon]:justify-center"
+        >
+          <Image
+            src="/AgentBridge_logo.png"
+            alt="AgentBridge AI logo"
+            width={36}
+            height={36}
+            priority
+            className="size-9 shrink-0 object-contain"
+          />
+          <span className="truncate text-base font-semibold tracking-tight group-data-[collapsible=icon]:hidden">
+            AgentBridge
+          </span>
+        </Link>
+      </SidebarHeader>
 
-      <SidebarContent className="flex-1 pt-11">
+      <SidebarContent className="flex-1 pt-2">
         {navigationGroups.map((group) => (
           <SidebarGroup key={group.title}>
             <SidebarGroupLabel>{group.title}</SidebarGroupLabel>
-
             <SidebarGroupContent>
               <SidebarMenu>
                 {group.items.map((item) => {
