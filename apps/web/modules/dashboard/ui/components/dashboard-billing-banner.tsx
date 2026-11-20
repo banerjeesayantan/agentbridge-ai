@@ -10,8 +10,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 export const DashboardBillingBanner = () => {
-  const summary = useQuery(api.private.usage.summary);
   const [checkoutReturned, setCheckoutReturned] = useState<"success" | "cancelled" | null>(null);
+  const summary = useQuery(api.private.usage.summary, checkoutReturned === "success" ? {} : "skip");
 
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -22,9 +22,7 @@ export const DashboardBillingBanner = () => {
     window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
   }, []);
 
-  if (summary === undefined) return null;
-
-  if (summary.pastDue) {
+  if (checkoutReturned === "cancelled") {
     return (
       <div className="px-4 pt-3">
         <Alert variant="destructive">
@@ -49,6 +47,33 @@ export const DashboardBillingBanner = () => {
           <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
             <span>No subscription change was made. Your organization remains on its current plan.</span>
             <Button asChild size="sm" variant="outline"><Link href="/billing">View plans</Link></Button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  if (summary === undefined) {
+    return (
+      <div className="px-4 pt-3">
+        <Alert>
+          <Clock3Icon className="size-4" />
+          <AlertTitle>Payment received — confirming your subscription</AlertTitle>
+          <AlertDescription>Checking the latest organization billing status from Polar…</AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  if (summary.pastDue) {
+    return (
+      <div className="px-4 pt-3">
+        <Alert variant="destructive">
+          <AlertTriangleIcon className="size-4" />
+          <AlertTitle>Payment needs attention</AlertTitle>
+          <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
+            <span>Your organization’s subscription has a payment issue. Update the payment method to keep paid features.</span>
+            <Button asChild size="sm" variant="outline"><Link href="/billing">Manage billing</Link></Button>
           </AlertDescription>
         </Alert>
       </div>
