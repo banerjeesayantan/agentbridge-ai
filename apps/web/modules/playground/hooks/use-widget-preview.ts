@@ -47,7 +47,7 @@ const POLL_INTERVAL_MS = 400;
 export const PREVIEW_SRC_DOC = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-  body{margin:0;font-family:system-ui,sans-serif;color:#475569;background:#fff}
+  html,body{height:100%;min-height:100%;margin:0}body{font-family:system-ui,sans-serif;color:#475569;background:#fff}
   header{padding:16px 24px;border-bottom:1px solid #e2e8f0;font-weight:600;color:#0f172a}
   main{padding:24px;max-width:640px}
   .bar{height:12px;border-radius:6px;background:#e2e8f0;margin:12px 0}
