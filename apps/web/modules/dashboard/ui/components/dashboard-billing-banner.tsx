@@ -22,21 +22,6 @@ export const DashboardBillingBanner = () => {
     window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
   }, []);
 
-  if (checkoutReturned === "cancelled") {
-    return (
-      <div className="px-4 pt-3">
-        <Alert variant="destructive">
-          <AlertTriangleIcon className="size-4" />
-          <AlertTitle>Payment needs attention</AlertTitle>
-          <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
-            <span>Your organization’s subscription has a payment issue. Update the payment method to keep paid features.</span>
-            <Button asChild size="sm" variant="outline"><Link href="/billing">Manage billing</Link></Button>
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
-
   if (!checkoutReturned) return null;
 
   if (checkoutReturned === "cancelled") {
