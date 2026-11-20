@@ -233,7 +233,7 @@ export const createCheckout = action({
              * return them to dashboard without changing plan.
              */
             returnUrl:
-              `${base}/billing?checkout=cancelled`,
+              `${base}/?checkout=cancelled`,
           }),
         },
       );
