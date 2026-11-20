@@ -1,6 +1,6 @@
 "use client";
 
-import { EMBED_SCRIPT_URL } from "@/modules/integrations/constants";
+import { PLAYGROUND_EMBED_SCRIPT_URL } from "@/modules/integrations/constants";
 import type { WidgetPosition } from "@/modules/integrations/utils";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -119,7 +119,8 @@ for (const level of ["warn", "error"] as const) {
 }
     setBundleStatus("loading");
     const script = doc.createElement("script");
-    script.src = EMBED_SCRIPT_URL;
+    const scriptUrl = new URL(PLAYGROUND_EMBED_SCRIPT_URL, window.location.origin).toString();
+    script.src = scriptUrl;
     script.async = true;
     script.onload = () => {
       const api = getApi();
@@ -141,7 +142,7 @@ for (const level of ["warn", "error"] as const) {
     };
     script.onerror = () => {
       setBundleStatus("error");
-      log("error", `Could not load the widget bundle from ${new URL(EMBED_SCRIPT_URL, window.location.href).host}. Check the URL, network and CSP.`);
+      log("error", `Could not load the widget bundle from ${new URL(scriptUrl).host}${new URL(scriptUrl).pathname}. Check the route, network and CSP.`);
     };
     doc.body.appendChild(script);
   }, [getApi, log, sync]);
