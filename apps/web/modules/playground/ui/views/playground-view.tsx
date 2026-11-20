@@ -32,7 +32,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { EMBED_SCRIPT_URL, INTEGRATIONS, type IntegrationId } from "@/modules/integrations/constants";
+import { PLAYGROUND_EMBED_SCRIPT_URL, INTEGRATIONS, type IntegrationId } from "@/modules/integrations/constants";
 import { createScript, type WidgetPosition } from "@/modules/integrations/utils";
 import { CodeBlock } from "@/modules/integrations/ui/components/code-block";
 import {
@@ -371,8 +371,8 @@ export const PlaygroundView = () => {
                     </div>
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-muted-foreground">Script</span>
-                      <span className="truncate font-mono text-xs" title={EMBED_SCRIPT_URL}>
-                        {EMBED_SCRIPT_URL}
+                      <span className="truncate font-mono text-xs" title={PLAYGROUND_EMBED_SCRIPT_URL}>
+                        {PLAYGROUND_EMBED_SCRIPT_URL}
                       </span>
                     </div>
                   </CardContent>
