@@ -25,10 +25,8 @@ import {
   AlertTriangleIcon,
   EyeIcon,
   EyeOffIcon,
-  MonitorIcon,
   PlayIcon,
   RefreshCwIcon,
-  SmartphoneIcon,
   Trash2Icon,
 } from "lucide-react";
 import Link from "next/link";
@@ -173,7 +171,7 @@ export const PlaygroundView = () => {
   const snippet = createScript(framework, orgId || "YOUR_ORGANIZATION_ID", position);
 
   return (
-    <div className="flex min-h-svh w-full min-w-0 max-w-full flex-col overflow-x-hidden bg-muted xl:h-svh xl:overflow-hidden">
+    <div className="flex h-full min-h-0 w-full min-w-0 max-w-full flex-col overflow-hidden bg-muted">
       <header className="flex min-h-14 shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-b bg-background px-3 py-2 sm:px-4">
         <h1 className="font-semibold text-base">Widget preview</h1>
         <div aria-live="polite" className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2">
@@ -182,9 +180,9 @@ export const PlaygroundView = () => {
         </div>
       </header>
 
-      <div className="grid w-full min-w-0 flex-1 grid-cols-1 gap-3 p-2 sm:gap-4 sm:p-4 xl:min-h-0 xl:grid-cols-[minmax(0,1fr)_minmax(320px,380px)]">
+      <div className="grid min-h-0 w-full min-w-0 flex-1 grid-cols-1 gap-3 overflow-y-auto p-2 sm:gap-3 sm:p-3 xl:grid-cols-[minmax(0,1fr)_minmax(320px,360px)] xl:overflow-hidden">
         {/* Preview canvas */}
-        <Card className="flex min-h-[400px] min-w-0 max-w-full flex-col gap-0 overflow-hidden py-0 sm:min-h-[460px] xl:min-h-0">
+        <Card className="flex min-h-[280px] min-w-0 max-w-full flex-col gap-0 overflow-hidden py-0 xl:min-h-0">
           <CardHeader className="flex flex-col items-stretch gap-3 border-b px-3 py-3 sm:flex-row sm:items-center sm:px-4">
             <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:w-auto" role="toolbar" aria-label="Widget lifecycle">
               <Button disabled={!canInit} onClick={() => actions.init(orgId, position, previewToken ?? undefined)} size="sm" type="button">
@@ -204,21 +202,7 @@ export const PlaygroundView = () => {
                 Destroy
               </Button>
             </div>
-            <ToggleGroup
-              aria-label="Preview size"
-              className="ml-0 shrink-0 self-start sm:ml-auto sm:self-auto"
-              onValueChange={(value) => value && setDevice(value as "desktop" | "mobile")}
-              type="single"
-              value={device}
-              variant="outline"
-            >
-              <ToggleGroupItem aria-label="Desktop preview" value="desktop">
-                <MonitorIcon className="size-4" />
-              </ToggleGroupItem>
-              <ToggleGroupItem aria-label="Mobile preview" value="mobile">
-                <SmartphoneIcon className="size-4" />
-              </ToggleGroupItem>
-            </ToggleGroup>
+            
           </CardHeader>
 
           {(toolbarHint || bundleStatus === "error" || bundleStatus === "missing-api") && (
@@ -246,7 +230,7 @@ export const PlaygroundView = () => {
             </div>
           )}
 
-          <CardContent className="flex min-h-[300px] min-w-0 flex-1 items-stretch justify-center overflow-hidden p-2 sm:min-h-[360px] sm:p-4 xl:min-h-0">
+          <CardContent className="flex min-h-0 min-w-0 flex-1 items-stretch justify-center overflow-hidden p-2 sm:p-3">
             <div
               className={cn(
                 "w-full overflow-hidden border bg-white shadow-sm transition-[max-width] duration-200",
@@ -266,7 +250,7 @@ export const PlaygroundView = () => {
         </Card>
 
         {/* Configure / Install / Diagnostics */}
-        <Card className="flex min-h-[400px] min-w-0 max-w-full flex-col gap-0 overflow-hidden py-0 sm:min-h-[460px] xl:min-h-0">
+        <Card className="flex min-h-[280px] min-w-0 max-w-full flex-col gap-0 overflow-hidden py-0 xl:min-h-0">
           <Tabs className="flex min-h-0 flex-1 flex-col gap-0" defaultValue="configure">
             <div className="border-b p-3">
               <TabsList className="grid h-auto w-full grid-cols-3">
@@ -406,7 +390,7 @@ export const PlaygroundView = () => {
                     </div>
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-muted-foreground">Script</span>
-                      <span className="truncate font-mono text-xs" title={PLAYGROUND_EMBED_SCRIPT_URL}>
+                      <span className="min-w-0 break-all text-right font-mono text-[11px] leading-4" title={PLAYGROUND_EMBED_SCRIPT_URL}>
                         {PLAYGROUND_EMBED_SCRIPT_URL}
                       </span>
                     </div>
@@ -428,7 +412,7 @@ export const PlaygroundView = () => {
                   </div>
                   <ol
                     aria-label="Widget event log"
-                    className="max-h-80 space-y-1.5 overflow-y-auto rounded-md border bg-background p-3 font-mono text-xs"
+                    className="max-h-[min(32vh,16rem)] min-h-24 space-y-1.5 overflow-y-auto rounded-md border bg-background p-3 font-mono text-xs"
                     role="log"
                   >
                     {preview.logs.length === 0 ? (
