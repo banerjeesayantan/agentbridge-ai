@@ -226,7 +226,7 @@ export const createCheckout = action({
              * The Polar webhook does that.
              */
             successUrl:
-              `${base}/billing?checkout=success`,
+              `${base}/?checkout=success`,
 
             /*
              * User cancels checkout:
