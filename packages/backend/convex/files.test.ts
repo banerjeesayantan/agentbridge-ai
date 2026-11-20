@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
-import { extractMock, fakeRagEntries, resetFakeRag } from "./test.mocks";
+import { extractMock, fakeRagEntries, resetFakeRag, setFakeRagStatus } from "./test.mocks";
 import { identity, newT } from "./tenancy.testkit";
 
 vi.mock("./system/ai/rag", async () => ({ default: (await import("./test.mocks")).fakeRag }));
@@ -175,4 +175,49 @@ describe("storage lifecycle and ownership", () => {
     await admin(t).mutation(api.private.files.deleteFile, { entryId: entryId as never });
     expect(fakeRagEntries()).toHaveLength(0);
   });
+
+  it.each(["pending", "replaced"] as const)(
+    "the owner can download and delete a %s RAG entry",
+    async (status) => {
+      const t = newT();
+      const { entryId } = await add(t, "lifecycle.txt", enc("hello")) as {
+        entryId: string;
+      };
+      setFakeRagStatus(entryId, status);
+
+      const url = await t
+        .withIdentity(identity("org_A", "org:member"))
+        .action(api.private.files.getDownloadUrl, { entryId: entryId as never });
+      expect(typeof url).toBe("string");
+
+      await admin(t).mutation(api.private.files.deleteFile, {
+        entryId: entryId as never,
+      });
+      expect(fakeRagEntries()).toHaveLength(0);
+      expect(await storageCount(t)).toBe(0);
+    },
+  );
 });
+
+  it("prevents another organization from downloading or deleting a file", async () => {
+    const t = newT();
+    const { entryId } = await add(t, "private.txt", enc("org A secret")) as {
+      entryId: string;
+    };
+
+    await expect(
+      t.withIdentity(identity("org_B", "org:member")).action(
+        api.private.files.getDownloadUrl,
+        { entryId: entryId as never },
+      ),
+    ).rejects.toThrow();
+
+    await expect(
+      admin(t, "org_B").mutation(api.private.files.deleteFile, {
+        entryId: entryId as never,
+      }),
+    ).rejects.toThrow();
+
+    expect(fakeRagEntries()).toHaveLength(1);
+    expect(await storageCount(t)).toBe(1);
+  });

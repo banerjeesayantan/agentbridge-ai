@@ -1,4 +1,4 @@
-import { requireOrg, requireRole } from "../lib/auth";
+﻿import { requireOrg, requireRole } from "../lib/auth";
 import { ConvexError, v } from "convex/values";
 import { internal } from "../_generated/api";
 import { action } from "../_generated/server";
@@ -20,7 +20,9 @@ async function requireBillingOrg(
   ctx: { auth: { getUserIdentity: () => Promise<any> } },
   adminOnly: boolean,
 ) {
-  const auth = adminOnly ? await requireRole(ctx, "admin") : await requireOrg(ctx);
+  const auth = adminOnly
+    ? await requireRole(ctx, "admin")
+    : await requireOrg(ctx);
   const identity = await ctx.auth.getUserIdentity();
   return { identity, orgId: auth.orgId };
 }
@@ -67,14 +69,11 @@ export const getCatalog = action({
           );
 
           const price =
-            product.prices?.find(
-              (p: any) => !p.is_archived,
-            ) ?? product.prices?.[0];
+            product.prices?.find((p: any) => !p.is_archived) ??
+            product.prices?.[0];
 
           const priceAmount =
-            typeof price?.price_amount === "number"
-              ? price.price_amount
-              : null;
+            typeof price?.price_amount === "number" ? price.price_amount : null;
 
           const currency =
             typeof price?.price_currency === "string"
@@ -82,9 +81,7 @@ export const getCatalog = action({
               : null;
 
           const interval =
-            product.recurring_interval ??
-            price?.recurring_interval ??
-            null;
+            product.recurring_interval ?? price?.recurring_interval ?? null;
 
           /*
            * Product exists, but without a usable price
@@ -107,11 +104,7 @@ export const getCatalog = action({
             interval,
           };
         } catch (error) {
-          console.error(
-            "Failed to load Polar product",
-            plan,
-            error,
-          );
+          console.error("Failed to load Polar product", plan, error);
 
           return {
             ...base,
@@ -135,16 +128,10 @@ export const getCatalog = action({
  */
 export const createCheckout = action({
   args: {
-    plan: v.union(
-      v.literal("pro"),
-      v.literal("enterprise"),
-    ),
+    plan: v.union(v.literal("pro"), v.literal("enterprise")),
   },
 
-  handler: async (
-    ctx,
-    args,
-  ): Promise<{ url: string }> => {
+  handler: async (ctx, args): Promise<{ url: string }> => {
     const { identity, orgId } = await requireBillingOrg(ctx, true);
 
     /*
@@ -180,10 +167,7 @@ export const createCheckout = action({
       },
     );
 
-    const currentPlan = resolveEntitlements(
-      subscription,
-      Date.now(),
-    ).plan;
+    const currentPlan = resolveEntitlements(subscription, Date.now()).plan;
 
     if (currentPlan !== "free") {
       throw new ConvexError({
@@ -204,47 +188,43 @@ export const createCheckout = action({
     const base = appUrl.replace(/\/+$/, "");
 
     try {
-      const checkout = await polarRequest<{ url: string }>(
-        "/v1/checkouts/",
-        {
-          method: "POST",
+      const checkout = await polarRequest<{ url: string }>("/v1/checkouts/", {
+        method: "POST",
 
-          body: checkoutBody({
-            productId,
-            organizationId: orgId,
+        body: checkoutBody({
+          productId,
+          organizationId: orgId,
 
-            email:
-              typeof identity.email === "string"
-                ? identity.email
-                : undefined,
+          email:
+            typeof identity.email === "string" ? identity.email : undefined,
 
-            /*
-             * Successful checkout returns to dashboard.
-             *
-             * IMPORTANT:
-             * This redirect does NOT grant the subscription.
-             * The Polar webhook does that.
-             */
-            successUrl:
-              `${base}/billing?checkout=success`,
+          /*
+           * Successful checkout returns to dashboard.
+           *
+           * IMPORTANT:
+           * This redirect does NOT grant the subscription.
+           * The Polar webhook does that.
+           */
+          successUrl: `${base}/billing?checkout=success`,
 
-            /*
-             * User cancels checkout:
-             * return them to dashboard without changing plan.
-             */
-            returnUrl:
-              `${base}/billing?checkout=cancelled`,
-          }),
-        },
-      );
+          /*
+           * User returns after successful checkout.
+           * Redirect to the main dashboard.
+           * Subscription activation is handled by the Polar webhook.
+           */
 
-      if (
-        !checkout.url ||
-        !/^https:\/\//i.test(checkout.url)
-      ) {
-        throw new Error(
-          "Polar returned an invalid checkout URL.",
-        );
+          returnUrl: `${base}/billing?checkout=cancelled`,
+
+          /*
+           * User clicks Back or cancels checkout.
+           * Return them to the billing/pricing page.
+           * Their current plan remains unchanged.
+           */
+        }),
+      });
+
+      if (!checkout.url || !/^https:\/\//i.test(checkout.url)) {
+        throw new Error("Polar returned an invalid checkout URL.");
       }
 
       return {
@@ -253,15 +233,12 @@ export const createCheckout = action({
     } catch (error) {
       console.error(
         "Polar checkout creation failed",
-        error instanceof Error
-          ? error.message
-          : error,
+        error instanceof Error ? error.message : error,
       );
 
       throw new ConvexError({
         code: "BAD_GATEWAY",
-        message:
-          "Couldn't start checkout. Please try again in a moment.",
+        message: "Couldn't start checkout. Please try again in a moment.",
       });
     }
   },
@@ -278,9 +255,7 @@ export const createCheckout = action({
 export const createPortalSession = action({
   args: {},
 
-  handler: async (
-    ctx,
-  ): Promise<{ url: string }> => {
+  handler: async (ctx): Promise<{ url: string }> => {
     const { orgId } = await requireBillingOrg(ctx, true);
 
     try {
@@ -292,29 +267,21 @@ export const createPortalSession = action({
         });
       }
 
-      const session =
-        await polarRequest<{
-          customer_portal_url: string;
-        }>(
-          "/v1/customer-sessions/",
-          {
-            method: "POST",
+      const session = await polarRequest<{
+        customer_portal_url: string;
+      }>("/v1/customer-sessions/", {
+        method: "POST",
 
-            body: {
-              external_customer_id: orgId,
-            },
-          },
-        );
+        body: {
+          external_customer_id: orgId,
+        },
+      });
 
       if (
         !session.customer_portal_url ||
-        !/^https:\/\//i.test(
-          session.customer_portal_url,
-        )
+        !/^https:\/\//i.test(session.customer_portal_url)
       ) {
-        throw new Error(
-          "Polar returned an invalid customer portal URL.",
-        );
+        throw new Error("Polar returned an invalid customer portal URL.");
       }
 
       return {
@@ -325,15 +292,11 @@ export const createPortalSession = action({
         throw error;
       }
 
-      console.error(
-        "Failed to create Polar customer session",
-        error,
-      );
+      console.error("Failed to create Polar customer session", error);
 
       throw new ConvexError({
         code: "NOT_FOUND",
-        message:
-          "No billing account found for this organization yet.",
+        message: "No billing account found for this organization yet.",
       });
     }
   },

@@ -132,6 +132,7 @@ function DialogDescription({
 export {
   Dialog,
   DialogContent,
+  DialogClose,
   DialogDescription,
   DialogFooter,
   DialogHeader,

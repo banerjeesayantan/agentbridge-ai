@@ -45,3 +45,6 @@ npm-debug.log*
 node_modules/
 .next/
 .turbo/
+
+# Convex debug snapshots (may contain deployment credentials)
+/packages/backend/.convex-push-debug-*.json

@@ -1,5 +1,5 @@
 "use client";
-
+import { useEffect } from "react";
 import { useOrganization } from "@clerk/nextjs";
 import {
   CreditCardIcon,
@@ -26,6 +26,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  useSidebar,
 } from "@workspace/ui/components/sidebar";
 import { cn } from "@workspace/ui/lib/utils";
 
@@ -100,35 +101,31 @@ const OrganizationFooter = () => {
     return null;
   }
 
-  const role = membership?.role
-    ?.replace(/^org:/, "")
-    .replace(/_/g, " ");
+  const role = membership?.role?.replace(/^org:/, "").replace(/_/g, " ");
 
   const formattedRole = role
     ? role.charAt(0).toUpperCase() + role.slice(1)
     : "Member";
 
   return (
-  <div className="flex min-w-0 items-center gap-3 rounded-lg px-2 py-3 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
-  {organization.imageUrl ? (
-    <Image
-      src={organization.imageUrl}
-      alt={`${organization.name} logo`}
-      width={36}
-      height={36}
-      unoptimized
-      className="size-9 shrink-0 rounded-lg object-cover"
-    />
-  ) : (
-    <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-sidebar-accent text-sm font-semibold">
-      {organization.name.charAt(0).toUpperCase()}
-    </div>
-  )}
+    <div className="flex min-w-0 items-center gap-3 rounded-lg px-2 py-3 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+      {organization.imageUrl ? (
+        <Image
+          src={organization.imageUrl}
+          alt={`${organization.name} logo`}
+          width={36}
+          height={36}
+          unoptimized
+          className="size-9 shrink-0 rounded-lg object-cover"
+        />
+      ) : (
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-sidebar-accent text-sm font-semibold">
+          {organization.name.charAt(0).toUpperCase()}
+        </div>
+      )}
 
       <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
-        <p className="truncate text-sm font-semibold">
-          {organization.name}
-        </p>
+        <p className="truncate text-sm font-semibold">{organization.name}</p>
         <p className="truncate text-xs capitalize text-muted-foreground">
           {formattedRole}
         </p>
@@ -139,6 +136,11 @@ const OrganizationFooter = () => {
 
 export const DashboardSidebar = () => {
   const pathname = usePathname();
+  const { setOpenMobile } = useSidebar();
+
+  useEffect(() => {
+    setOpenMobile(false);
+  }, [pathname, setOpenMobile]);
 
   const isActive = (url: string) => {
     if (url === "/") {
@@ -171,7 +173,7 @@ export const DashboardSidebar = () => {
                         tooltip={item.title}
                         className={cn(
                           active &&
-                            "bg-gradient-to-b from-sidebar-primary to-[#0b63f3]! text-sidebar-primary-foreground! hover:to-[#0b63f3]/90!"
+                            "bg-gradient-to-b from-sidebar-primary to-[#0b63f3]! text-sidebar-primary-foreground! hover:to-[#0b63f3]/90!",
                         )}
                       >
                         <Link href={item.url}>

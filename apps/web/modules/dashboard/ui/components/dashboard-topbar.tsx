@@ -3,18 +3,16 @@
 import Image from "next/image";
 import Link from "next/link";
 import { UserButton } from "@clerk/nextjs";
-import { PanelLeftIcon } from "lucide-react";
 import { SidebarTrigger } from "@workspace/ui/components/sidebar";
 
 export const DashboardTopbar = () => {
   return (
     <header className="sticky top-0 z-40 flex h-16 w-full shrink-0 items-center gap-3 border-b bg-background px-4">
       <SidebarTrigger
-        className="size-9 shrink-0"
-        aria-label="Toggle sidebar"
-      >
-        <PanelLeftIcon className="size-5" />
-      </SidebarTrigger>
+  className="size-9 shrink-0"
+  aria-label="Toggle sidebar"
+/>
+
 
       <Link
         href="/"

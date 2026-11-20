@@ -1,6 +1,6 @@
-﻿import { requireOrg, requireRole } from "../lib/auth";
+import { requireOrg, requireRole } from "../lib/auth";
 import { ConvexError, v } from "convex/values";
-import { 
+import {
   contentHashFromArrayBuffer,
   Entry,
   EntryId,
@@ -15,6 +15,7 @@ import { internal } from "../_generated/api";
 import { limitError } from "../lib/entitlements";
 import { INPUT, assertOptionalText } from "../lib/limits";
 import { validateUpload } from "../lib/fileValidation";
+
 
 export const deleteFile = mutation({
   args: {
@@ -31,33 +32,56 @@ export const deleteFile = mutation({
       throw new ConvexError({ code: "NOT_FOUND", message: "Not found" });
     }
 
+    // RAG entries can be pending while embeddings are generated, ready
+    // after ingestion, or replaced after a same-key upload. Search every
+    // lifecycle state so an owner can always remove their own stored file.
+    let found = false;
+
+    for (const status of ["pending", "ready", "replaced"] as const) {
+      let cursor: string | null = null;
+      let isDone = false;
+
+      while (!isDone) {
+        const result = await rag.list(ctx, {
+          namespaceId: namespace.namespaceId,
+          paginationOpts: { cursor, numItems: 100 },
+          status,
+        });
+
+        if (result.page.some((item) => item.entryId === args.entryId)) {
+          found = true;
+          break;
+        }
+
+        cursor = result.continueCursor;
+        isDone = result.isDone;
+      }
+
+      if (found) break;
+    }
+
+    if (!found) {
+      throw new ConvexError({ code: "NOT_FOUND", message: "Not found" });
+    }
+
     const entry = await rag.getEntry(ctx, {
       entryId: args.entryId,
     });
 
-    if (!entry) {
-      throw new ConvexError({
-        code: "NOT_FOUND",
-        message: "Entry not found",
-      });
-    }
-
-    if (entry.metadata?.uploadedBy !== orgId) {
-      throw new ConvexError({
-        code: "NOT_FOUND",
-        message: "Not found",
-      });
+    if (!entry || entry.metadata?.uploadedBy !== orgId) {
+      throw new ConvexError({ code: "NOT_FOUND", message: "Not found" });
     }
 
     if (entry.metadata?.storageId) {
-      await ctx.storage.delete(entry.metadata.storageId as Id<"_storage">)
+      await ctx.storage.delete(entry.metadata.storageId as Id<"_storage">);
     }
 
     await rag.deleteAsync(ctx, {
-      entryId: args.entryId
+      entryId: args.entryId,
     });
   },
 });
+
 
 export const addFile = action({
   args: {
@@ -68,25 +92,43 @@ export const addFile = action({
     bytes: v.bytes(),
     category: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{ entryId: EntryId }> => {
     const { orgId } = await requireRole(ctx, "admin");
 
     const check = validateUpload(args.filename, args.bytes);
-    if (!check.ok) throw new ConvexError({ code: "BAD_REQUEST", message: check.reason });
-    const category = assertOptionalText(args.category, INPUT.NAME_MAX, "category");
+    if (!check.ok)
+      throw new ConvexError({ code: "BAD_REQUEST", message: check.reason });
+    const category = assertOptionalText(
+      args.category,
+      INPUT.NAME_MAX,
+      "category",
+    );
 
-    const entitlements = await ctx.runQuery(internal.system.subscriptions.getEntitlements, {
-      organizationId: orgId,
-    });
+    const entitlements = await ctx.runQuery(
+      internal.system.subscriptions.getEntitlements,
+      {
+        organizationId: orgId,
+      },
+    );
 
     // Atomic limit check + reservation (no check-then-act race).
-    const slot = await ctx.runMutation(internal.system.fileUploads.reserveSlot, {
-      organizationId: orgId,
-      key: check.filename,
-      limit: entitlements.limits.knowledgeFiles,
-    });
+    const slot = await ctx.runMutation(
+      internal.system.fileUploads.reserveSlot,
+      {
+        organizationId: orgId,
+        key: check.filename,
+        limit: entitlements.limits.knowledgeFiles,
+      },
+    );
     if (!slot.ok) {
-      throw new ConvexError(limitError("knowledge-base file", slot.used, slot.limit, entitlements.periodEnd));
+      throw new ConvexError(
+        limitError(
+          "knowledge-base file",
+          slot.used,
+          slot.limit,
+          entitlements.periodEnd,
+        ),
+      );
     }
 
     // Model-based extraction (images, PDFs, HTML) is a metered AI operation.
@@ -105,12 +147,16 @@ export const addFile = action({
           operationKey: `file-ingestion:${requestId}`,
         });
         if (!usage.allowed) {
-          throw new ConvexError(limitError("AI message", usage.used, usage.limit, usage.resetsAt));
+          throw new ConvexError(
+            limitError("AI message", usage.used, usage.limit, usage.resetsAt),
+          );
         }
         charged = true;
       }
 
-      storageId = await ctx.storage.store(new Blob([args.bytes], { type: check.mimeType }));
+      storageId = await ctx.storage.store(
+        new Blob([args.bytes], { type: check.mimeType }),
+      );
 
       const text = await extractTextContent(ctx, {
         storageId,
@@ -119,36 +165,39 @@ export const addFile = action({
         mimeType: check.mimeType,
       });
 
-      const { entryId, created, replacedEntry } = await rag.add(ctx, {
-        // SUPER IMPORTANT: What search space to add this to. You cannot search across namespaces,
-        // If not added, it will be considered global (we do not want this)
-        namespace: orgId,
+      const ragResult: {
+        entryId: EntryId;
+        created: boolean;
+        oldStorageId: Id<"_storage"> | null;
+      } = await ctx.runAction(internal.private.fileRag.addRagEntry, {
+        organizationId: orgId,
         text,
-        key: check.filename,
-        title: check.filename,
-        metadata: {
-          storageId, // Important for file deletion
-          uploadedBy: orgId, // Important for deletion
-          filename: check.filename,
-          category: category ?? null,
-        } as EntryMetadata,
-        contentHash: await contentHashFromArrayBuffer(args.bytes), // To avoid re-inserting if the file content hasn't changed
+        filename: check.filename,
+        category: category ?? null,
+        storageId,
+        contentHash: await contentHashFromArrayBuffer(args.bytes),
       });
+
+      const { entryId, created, oldStorageId } = ragResult;
+
       committed = true;
 
       if (!created) {
         // Duplicate content is already indexed. Blob cleanup is best-effort.
         await ctx.storage.delete(storageId).catch((error) => {
-          console.error("ALERT: duplicate upload blob cleanup failed", String(error).slice(0, 200));
+          console.error(
+            "ALERT: duplicate upload blob cleanup failed",
+            String(error).slice(0, 200),
+          );
         });
-      } else {
+      } else if (oldStorageId && oldStorageId !== storageId) {
         // Replacing a same-named file must not orphan the previous blob.
-        const oldStorageId = (replacedEntry?.metadata as EntryMetadata | undefined)?.storageId;
-        if (oldStorageId && oldStorageId !== storageId) {
-          await ctx.storage.delete(oldStorageId).catch((error) => {
-            console.error("ALERT: replaced upload blob cleanup failed", String(error).slice(0, 200));
-          });
-        }
+        await ctx.storage.delete(oldStorageId).catch((error) => {
+          console.error(
+            "ALERT: replaced upload blob cleanup failed",
+            String(error).slice(0, 200),
+          );
+        });
       }
 
       return { entryId };
@@ -162,10 +211,18 @@ export const addFile = action({
         });
       }
       if (error instanceof ConvexError) throw error;
-      console.error("ALERT: knowledge file ingestion failed", { organizationId: orgId, error: String(error).slice(0, 300) });
-      throw new ConvexError({ code: "BAD_GATEWAY", message: "The file could not be processed. You were not charged." });
+      console.error("ALERT: knowledge file ingestion failed", {
+        organizationId: orgId,
+        error: String(error).slice(0, 300),
+      });
+      throw new ConvexError({
+        code: "BAD_GATEWAY",
+        message: "The file could not be processed. You were not charged.",
+      });
     } finally {
-      await ctx.runMutation(internal.system.fileUploads.releaseSlot, { slotId: slot.slotId });
+      await ctx.runMutation(internal.system.fileUploads.releaseSlot, {
+        slotId: slot.slotId,
+      });
     }
   },
 });
@@ -178,14 +235,25 @@ export const getDownloadUrl = action({
   args: { entryId: vEntryId },
   handler: async (ctx, args): Promise<string> => {
     const { orgId } = await requireOrg(ctx);
-    const namespace = await rag.getNamespace(ctx, { namespace: orgId });
-    const entry = namespace ? await rag.getEntry(ctx, { entryId: args.entryId }) : null;
-    const metadata = entry?.metadata as EntryMetadata | undefined;
-    if (!namespace || !entry || metadata?.uploadedBy !== orgId || !metadata.storageId) {
+
+    const storageId = await ctx.runQuery(
+      internal.private.fileRag.getOwnedStorageId,
+      {
+        organizationId: orgId,
+        entryId: args.entryId,
+      },
+    );
+
+    if (!storageId) {
       throw new ConvexError({ code: "NOT_FOUND", message: "Not found" });
     }
-    const url = await ctx.storage.getUrl(metadata.storageId);
-    if (!url) throw new ConvexError({ code: "NOT_FOUND", message: "Not found" });
+
+    const url = await ctx.storage.getUrl(storageId);
+
+    if (!url) {
+      throw new ConvexError({ code: "NOT_FOUND", message: "Not found" });
+    }
+
     return url;
   },
 });
@@ -212,7 +280,7 @@ export const list = query({
     });
 
     const files = await Promise.all(
-      results.page.map((entry) => convertEntryToPublicFile(ctx, entry))
+      results.page.map((entry) => convertEntryToPublicFile(ctx, entry)),
     );
 
     const filteredFiles = args.category
@@ -228,7 +296,7 @@ export const list = query({
 });
 
 export type PublicFile = {
-  id: EntryId,
+  id: EntryId;
   name: string;
   type: string;
   size: string;
@@ -268,9 +336,9 @@ async function convertEntryToPublicFile(
 
   let status: "ready" | "processing" | "error" = "error";
   if (entry.status === "ready") {
-    status = "ready"
+    status = "ready";
   } else if (entry.status === "pending") {
-    status = "processing"
+    status = "processing";
   }
 
   return {
@@ -281,7 +349,7 @@ async function convertEntryToPublicFile(
     status,
     category: metadata?.category || undefined,
   };
-};
+}
 
 function formatFileSize(bytes: number): string {
   if (bytes === 0) {
@@ -293,5 +361,4 @@ function formatFileSize(bytes: number): string {
   const i = Math.floor(Math.log(bytes) / Math.log(k));
 
   return `${Number.parseFloat((bytes / k ** i).toFixed(1))} ${sizes[i]}`;
-};
-
+}

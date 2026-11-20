@@ -37,6 +37,56 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Informational until the existing Dependabot backlog is triaged.
+      # Keep the report in the job log so high/critical advisories are actionable.
+      - name: Audit dependency advisories
+        continue-on-error: true
+        run: |
+          pnpm audit --json > "$RUNNER_TEMP/pnpm-audit.json" || true
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const report = JSON.parse(fs.readFileSync(
+            process.env.RUNNER_TEMP + "/pnpm-audit.json",
+            "utf8",
+          ));
+          const counts = report.metadata?.vulnerabilities ?? {};
+          console.log("Dependency audit counts:", JSON.stringify(counts));
+          if (report.advisories) {
+            const rank = { critical: 4, high: 3, moderate: 2, low: 1, info: 0 };
+            const advisories = Object.entries(report.advisories).sort(
+              ([, a], [, b]) => (rank[b.severity] ?? 0) - (rank[a.severity] ?? 0),
+            );
+            for (const [id, item] of advisories) {
+              console.log(JSON.stringify({
+                id,
+                package: item.module_name,
+                severity: item.severity,
+                title: item.title,
+                url: item.url,
+                vulnerableVersions: item.vulnerable_versions,
+                patchedVersions: item.patched_versions,
+                cves: item.cves,
+                recommendation: item.recommendation,
+                findings: item.findings?.map((finding) => ({
+                  version: finding.version,
+                  paths: finding.paths?.map((path) => path.name),
+                })),
+              }));
+            }
+          } else {
+            const vulnerabilities = report.vulnerabilities ?? {};
+            for (const [name, item] of Object.entries(vulnerabilities)) {
+              console.log(JSON.stringify({
+                package: name,
+                severity: item.severity,
+                range: item.range,
+                fixAvailable: item.fixAvailable,
+                via: item.via,
+              }));
+            }
+          }
+          NODE
+
       - name: Run backend policy tests
         run: pnpm test
 

@@ -35,8 +35,8 @@ export const useVapi = () => {
   const organizationId = useAtomValue(organizationIdAtom);
   const contactSessionId = useAtomValue(contactSessionIdAtomFamily(organizationId ?? ""));
 
-  const authorizePaid = useAction(api.public.voicePaid.authorizeCall);
-  const reportCallStarted = useAction(api.public.voicePaid.reportCallStarted);
+  const authorizePaid = useAction(api.features.voice.public.voicePaid.authorizeCall);
+  const reportCallStarted = useAction(api.features.voice.public.voicePaid.reportCallStarted);
 
   const vapiRef = useRef<Vapi | null>(null);
   // Synchronous guard: state updates are async, so a double click could otherwise authorize twice.

@@ -4,7 +4,7 @@ import { internal } from "../_generated/api";
 import { internalAction } from "../_generated/server";
 import { mapSubscriptionEvent } from "../lib/polarMapping";
 import { verifyStandardWebhook } from "../lib/standardWebhooks";
-import { handlePolarOrderEvent } from "../lib/polarOrderHandler";
+import { handlePolarOrderEvent } from "../features/revenue/lib/polarOrderHandler";
 
 export const handle = internalAction({
   args: {
@@ -55,7 +55,7 @@ export const handle = internalAction({
     if (event.type === "order.paid" || event.type === "order.refunded") {
   return await handlePolarOrderEvent(
     ctx,
-    internal.system.revenue.applyPolarOrderEvent,
+    internal.features.revenue.internal.revenue.applyPolarOrderEvent,
     event.type,
     event.data,
     args.headers.webhookId,

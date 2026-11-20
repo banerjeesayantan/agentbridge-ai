@@ -35,7 +35,7 @@ const errorText = (e: unknown) => {
 };
 
 export const VoiceFinanceView = () => {
-  const gate = useQuery(api.private.voiceAdmin.amIAdmin);
+  const gate = useQuery(api.features.voice.private.voiceAdmin.amIAdmin);
   if (gate === undefined) {
     return (
       <div className="flex items-center gap-2 p-8 text-muted-foreground text-sm">
@@ -58,10 +58,10 @@ export const VoiceFinanceView = () => {
 };
 
 const Dashboard = () => {
-  const data = useQuery(api.private.voiceAdmin.overview);
-  const suspend = useMutation(api.private.voiceAdmin.suspendOrganizationVoice);
-  const restore = useMutation(api.private.voiceAdmin.restoreOrganizationVoice);
-  const setProvider = useMutation(api.private.voiceAdmin.setProviderAccount);
+  const data = useQuery(api.features.voice.private.voiceAdmin.overview);
+  const suspend = useMutation(api.features.voice.private.voiceAdmin.suspendOrganizationVoice);
+  const restore = useMutation(api.features.voice.private.voiceAdmin.restoreOrganizationVoice);
+  const setProvider = useMutation(api.features.voice.private.voiceAdmin.setProviderAccount);
   const [balance, setBalance] = useState("");
 
   const run = async (fn: () => Promise<unknown>, ok: string) => {
