@@ -263,7 +263,6 @@ export const PlaygroundView = () => {
                     onValueChange={(value) => {
                       const next = value as WidgetPosition;
                       setPosition(next);
-                      actions.applyPosition(next);
                     }}
                     value={position}
                   >
