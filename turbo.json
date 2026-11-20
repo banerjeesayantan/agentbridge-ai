@@ -13,6 +13,7 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
+      "passThroughEnv": ["SENTRY_AUTH_TOKEN"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"]
     },
