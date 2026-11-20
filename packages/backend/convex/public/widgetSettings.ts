@@ -4,7 +4,7 @@ import type { Doc } from "../_generated/dataModel";
 import { action } from "../_generated/server";
 import { assertOrgId } from "../lib/limits";
 import { signWidgetInstallToken, verifyWidgetInstallToken } from "../lib/widgetOrigin";
-import { requireOrg } from "../lib/auth";
+import { requireRole } from "../lib/auth";
 
 export const getByOrganizationId = action({
   args: { organizationId: v.string(), installToken: v.string() },
@@ -27,7 +27,7 @@ export const getPreviewToken = action({
   handler: async (ctx, args): Promise<{ token: string; expiresAt: number }> => {
     // Derive tenant and user from the verified Clerk identity; never accept an
     // organization ID supplied by the browser for preview authorization.
-    const auth = await requireOrg(ctx);
+    const auth = await requireRole(ctx, "admin");
     const organizationId = assertOrgId(auth.orgId);
 
     let origin: string;
