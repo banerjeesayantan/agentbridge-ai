@@ -49,6 +49,8 @@ Existing Clerk, Convex, AI provider, billing, voice, and monitoring variables mu
 
 ## Deployment sequence
 
+The first preview created during migration may still use the previous project framework setting. After changing the existing Vercel project framework to **Services**, create a fresh deployment from this branch so Vercel evaluates the `services` block. Confirm the build log shows all three service roots (`apps/web`, `apps/widget`, and `apps/embed`) before merging.
+
 1. Merge the multi-service configuration PR after CI and preview checks pass.
 2. Change the existing Vercel project's Framework Preset to **Services** and Root Directory to `./`.
 3. Configure the three embed variables above in the existing project.
