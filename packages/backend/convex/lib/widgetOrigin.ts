@@ -67,7 +67,17 @@ export async function verifyWidgetInstallToken(token: string, expectedOrganizati
     if (!valid) throw new Error("Invalid signature");
     const claims = JSON.parse(new TextDecoder().decode(decode(payload))) as WidgetInstallClaims;
     const now = Date.now();
-    if (claims.organizationId !== expectedOrganizationId || !Number.isFinite(claims.issuedAt) || !Number.isFinite(claims.expiresAt) || claims.issuedAt > now + 30_000 || claims.expiresAt <= now || claims.expiresAt - claims.issuedAt > 10 * 60_000) throw new Error("Expired or invalid claims");
+    if (
+      claims.organizationId !== expectedOrganizationId ||
+      typeof claims.origin !== "string" ||
+      claims.origin.length > 255 ||
+      (claims.preview !== undefined && typeof claims.preview !== "boolean") ||
+      !Number.isFinite(claims.issuedAt) ||
+      !Number.isFinite(claims.expiresAt) ||
+      claims.issuedAt > now + 30_000 ||
+      claims.expiresAt <= now ||
+      claims.expiresAt - claims.issuedAt > 10 * 60_000
+    ) throw new Error("Expired or invalid claims");
     if (expectedOrigin && claims.origin !== expectedOrigin) throw new Error("Origin mismatch");
     return claims;
   } catch {
