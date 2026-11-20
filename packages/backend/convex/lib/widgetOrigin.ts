@@ -48,6 +48,8 @@ export interface WidgetInstallClaims {
   origin: string;
   issuedAt: number;
   expiresAt: number;
+  // Preview tokens are issued only to authenticated organization members.
+  preview?: boolean;
 }
 
 export async function signWidgetInstallToken(claims: WidgetInstallClaims): Promise<string> {
