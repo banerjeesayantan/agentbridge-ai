@@ -32,7 +32,7 @@ export interface LogEntry {
 export type LastAction = "none" | "init" | "show" | "hide" | "destroy";
 
 interface WidgetApi {
-  init: (config?: { organizationId?: string; position?: WidgetPosition }) => boolean | void;
+  init: (config?: { organizationId?: string; position?: WidgetPosition; installToken?: string }) => boolean | void;
   show: () => void;
   hide: () => void;
   destroy: () => void;
@@ -181,14 +181,14 @@ for (const level of ["warn", "error"] as const) {
   );
 
   const init = useCallback(
-    (organizationId: string, position: WidgetPosition) => {
+    (organizationId: string, position: WidgetPosition, installToken?: string) => {
       setLastAction("init");
       setIsInitializing(true);
       const called = withApi("init", (api) => {
         // The embed's init() starts an asynchronous bootstrap request and
         // returns before its launcher/iframe is mounted. Do not treat the
         // immediate getState() result as an initialization failure.
-        const result = api.init({ organizationId, position });
+        const result = api.init({ organizationId, position, installToken });
         if (result === false) {
           setIsInitializing(false);
           sync();
