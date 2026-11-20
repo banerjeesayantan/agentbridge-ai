@@ -24,6 +24,16 @@ const ORG_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
 const HIDE_ANIMATION_MS = 300;
 
 (function () {
+  // Resolve the widget service from the origin that served this bundle. This
+  // keeps preview deployments self-contained while customer snippets use the
+  // production bundle origin. Local development keeps its explicit port.
+  const scriptSrc = (document.currentScript as HTMLScriptElement | null)?.src;
+  const runtimeWidgetUrl = import.meta.env.DEV
+    ? EMBED_CONFIG.WIDGET_URL
+    : scriptSrc
+      ? new URL("/widget", scriptSrc).toString()
+      : EMBED_CONFIG.WIDGET_URL;
+
   // Vite's IIFE wrapper (`extend: true`) pre-creates `window.AgentBridgeWidget`
   // as an empty object, so only treat it as "already loaded" when it carries a
   // real API. This protects against the script being included twice.
@@ -58,14 +68,14 @@ const HIDE_ANIMATION_MS = 300;
   }
 
   function widgetOrigin(): string {
-    return new URL(EMBED_CONFIG.WIDGET_URL).origin;
+    return new URL(runtimeWidgetUrl).origin;
   }
 
   function buildWidgetUrl(orgId: string, token: string): string {
     const params = new URLSearchParams();
     params.append("organizationId", orgId);
     const fragment = new URLSearchParams({ installToken: token });
-    return `${EMBED_CONFIG.WIDGET_URL}?${params.toString()}#${fragment.toString()}`;
+    return `${runtimeWidgetUrl}?${params.toString()}#${fragment.toString()}`;
   }
 
   function isMounted(): boolean {
