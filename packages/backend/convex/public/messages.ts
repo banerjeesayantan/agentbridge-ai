@@ -111,6 +111,7 @@ export const create = action({
       return;
     }
 
+    const agentStartedAt = Date.now();
     try {
       await supportAgent.generateText(
         ctx,
@@ -124,7 +125,13 @@ export const create = action({
           },
         },
       );
+      console.info("[performance] widget_agent_generation", {
+        durationMs: Date.now() - agentStartedAt,
+      });
     } catch (error) {
+      console.warn("[performance] widget_agent_generation_failed", {
+        durationMs: Date.now() - agentStartedAt,
+      });
       try {
         await ctx.runMutation(internal.system.usage.refund, {
           organizationId: conversation.organizationId,

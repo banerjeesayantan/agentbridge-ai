@@ -1,11 +1,9 @@
-import { chatModel } from "../models";
 import { createTool } from "@convex-dev/agent";
-import { generateText } from "ai";
 import z from "zod";
 import { internal } from "../../../_generated/api";
-import { supportAgent } from "../agents/supportAgent";
 import rag from "../rag";
-import { SEARCH_INTERPRETER_PROMPT } from "../constants";
+
+const MAX_KNOWLEDGE_CONTEXT_CHARS = 12_000;
 
 export const search = createTool({
   description: "Search the knowledge base for relevant information to help answer user questions",
@@ -28,41 +26,25 @@ export const search = createTool({
       return "Conversation not found";
     }
 
-    const orgId = conversation.organizationId;
-
+    const searchStartedAt = Date.now();
     const searchResult = await rag.search(ctx, {
-      namespace: orgId,
+      namespace: conversation.organizationId,
       query: args.query,
       limit: 5,
     });
-
-    const contextText = `Found results in ${searchResult.entries
-      .map((e) => e.title || null)
-      .filter((t) => t !== null)
-      .join(", ")}. Here is the context:\n\n${searchResult.text}`;
-
-    const response = await generateText({
-      messages: [
-        {
-          role: "system",
-          content: SEARCH_INTERPRETER_PROMPT,
-        },
-        {
-          role: "user",
-          content: `User asked: "${args.query}"\n\nSearch results: ${contextText}`
-        }
-      ],
-      model: chatModel(),
+    console.info("[performance] knowledge_search", {
+      durationMs: Date.now() - searchStartedAt,
+      resultChars: searchResult.text.length,
+      resultCount: searchResult.entries.length,
     });
 
-    await supportAgent.saveMessage(ctx, {
-      threadId: ctx.threadId,
-      message: {
-        role: "assistant",
-        content: response.text,
-      },
-    });
+    if (!searchResult.text.trim()) {
+      return "No relevant information was found in the knowledge base.";
+    }
 
-    return response.text;
+    // Return retrieved evidence directly to the parent agent. Running a
+    // second LLM call here to rewrite the search results adds another full
+    // model round-trip before the parent agent can finish its answer.
+    return searchResult.text.slice(0, MAX_KNOWLEDGE_CONTEXT_CHARS);
   },
 });

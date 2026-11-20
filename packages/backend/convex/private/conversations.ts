@@ -16,6 +16,7 @@ export const updateStatus = mutation({
   },
 
   handler: async (ctx, args) => {
+    const queryStartedAt = Date.now();
     const identity = await ctx.auth.getUserIdentity();
 
     if (identity === null) {
@@ -127,6 +128,7 @@ export const getMany = query({
   },
 
   handler: async (ctx, args) => {
+    const queryStartedAt = Date.now();
     const identity = await ctx.auth.getUserIdentity();
 
     if (identity === null) {
@@ -205,6 +207,13 @@ export const getMany = query({
     const validConversations = conversationsWithAdditionalData.filter(
       (conv): conv is NonNullable<typeof conv> => conv !== null
     );
+
+    console.info("[performance] dashboard_conversations_query", {
+      durationMs: Date.now() - queryStartedAt,
+      requestedItems: args.paginationOpts.numItems,
+      returnedItems: validConversations.length,
+      statusFiltered: Boolean(args.status),
+    });
 
     return {
       ...conversations,
