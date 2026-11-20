@@ -4,7 +4,7 @@ import type { Doc } from "../_generated/dataModel";
 import { action } from "../_generated/server";
 import { assertOrgId } from "../lib/limits";
 import { signWidgetInstallToken, verifyWidgetInstallToken } from "../lib/widgetOrigin";
-import { requireRole } from "../lib/auth";
+import { requireOrg } from "../lib/auth";
 
 export const getByOrganizationId = action({
   args: { organizationId: v.string(), installToken: v.string() },
@@ -25,9 +25,11 @@ export const getByOrganizationId = action({
 export const getPreviewToken = action({
   args: { origin: v.string() },
   handler: async (ctx, args): Promise<{ token: string; expiresAt: number }> => {
+    // Any authenticated organization member may preview the widget. The
+    // short-lived token is tenant-bound and does not grant settings-write access.
     // Derive tenant and user from the verified Clerk identity; never accept an
     // organization ID supplied by the browser for preview authorization.
-    const auth = await requireRole(ctx, "admin");
+    const auth = await requireOrg(ctx);
     const organizationId = assertOrgId(auth.orgId);
 
     let origin: string;
