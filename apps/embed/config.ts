@@ -4,7 +4,7 @@ export const EMBED_CONFIG = {
     import.meta.env.VITE_WIDGET_URL ||
     (import.meta.env.DEV
       ? "http://localhost:3001"
-      : "https://agentbridge-ai-seven.vercel.app/widget"),
+      : "https://agentbridge-ai-seven.vercel.app"),
   BOOTSTRAP_URL:
     import.meta.env.VITE_WIDGET_BOOTSTRAP_URL ||
     "https://whimsical-frog-463.convex.site/widget/bootstrap",
