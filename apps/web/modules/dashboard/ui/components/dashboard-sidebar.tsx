@@ -1,6 +1,6 @@
 "use client";
 import { useEffect } from "react";
-import { useOrganization } from "@clerk/nextjs";
+import { OrganizationSwitcher, useOrganization } from "@clerk/nextjs";
 import {
   CreditCardIcon,
   FlaskConicalIcon,
@@ -108,7 +108,13 @@ const OrganizationFooter = () => {
     : "Member";
 
   return (
-    <div className="flex min-w-0 items-center gap-3 rounded-lg px-2 py-3 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+    <div className="flex min-w-0 flex-col gap-2 px-1 py-2">
+      <OrganizationSwitcher
+        afterCreateOrganizationUrl="/"
+        afterSelectOrganizationUrl="/"
+        hidePersonal
+      />
+      <div className="flex min-w-0 items-center gap-3 rounded-lg px-1 py-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
       {organization.imageUrl ? (
         <Image
           src={organization.imageUrl}
@@ -129,6 +135,7 @@ const OrganizationFooter = () => {
         <p className="truncate text-xs capitalize text-muted-foreground">
           {formattedRole}
         </p>
+      </div>
       </div>
     </div>
   );
