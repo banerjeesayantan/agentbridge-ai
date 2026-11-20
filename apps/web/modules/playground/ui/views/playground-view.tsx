@@ -1,6 +1,8 @@
 "use client";
 
 import { useOrganization } from "@clerk/nextjs";
+import { useAction } from "convex/react";
+import { api } from "@workspace/backend/_generated/api";
 import { Alert, AlertDescription, AlertTitle } from "@workspace/ui/components/alert";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
@@ -80,25 +82,53 @@ const POSITION_LABEL: Record<WidgetPosition, string> = {
 export const PlaygroundView = () => {
   const { organization, isLoaded } = useOrganization();
   const orgId = organization?.id ?? "";
+  const authorizePreview = useAction(api.public.widgetSettings.getPreviewToken);
 
   const [position, setPosition] = useState<WidgetPosition>("bottom-right");
   const [device, setDevice] = useState<"desktop" | "mobile">("desktop");
   const [framework, setFramework] = useState<IntegrationId>("html");
+  const [previewToken, setPreviewToken] = useState<string | null>(null);
+  const [previewTokenError, setPreviewTokenError] = useState<string | null>(null);
 
   const preview = useWidgetPreview();
   const { bundleStatus, isInitializing, widgetState, lastAction, supportsState, actions } = preview;
   const autoInitKey = useRef<string | null>(null);
 
-  // Once the real bundle and Clerk organization are both ready, initialize the
-  // actual widget automatically. Re-run only after a preview reload, org
-  // change, or position change; the explicit lifecycle controls remain usable.
+  // Mint a short-lived token using the signed-in organization context. This
+  // lets the Playground preview work without weakening customer-site origin
+  // allowlists.
   useEffect(() => {
-    if (bundleStatus !== "ready" || !orgId) return;
+    if (!isLoaded || !orgId) {
+      setPreviewToken(null);
+      setPreviewTokenError(null);
+      return;
+    }
+    let cancelled = false;
+    setPreviewToken(null);
+    setPreviewTokenError(null);
+    void authorizePreview({ origin: window.location.origin })
+      .then(({ token }) => {
+        if (!cancelled) setPreviewToken(token);
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setPreviewTokenError(error instanceof Error ? error.message : "Could not authorize the widget preview.");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoaded, orgId, authorizePreview]);
+
+  // Once the bundle, organization, and preview authorization are ready,
+  // initialize the actual widget automatically.
+  useEffect(() => {
+    if (bundleStatus !== "ready" || !orgId || !previewToken) return;
     const key = `${preview.frameKey}:${orgId}:${position}`;
     if (autoInitKey.current === key) return;
     autoInitKey.current = key;
-    actions.init(orgId, position);
-  }, [bundleStatus, orgId, position, preview.frameKey, actions.init]);
+    actions.init(orgId, position, previewToken);
+  }, [bundleStatus, orgId, previewToken, position, preview.frameKey, actions.init]);
 
   const ready = bundleStatus === "ready";
   const initialized = widgetState?.initialized ?? false;
@@ -106,7 +136,7 @@ export const PlaygroundView = () => {
 
   // With a bundle that cannot report state we cannot know what is valid, so
   // leave the controls available rather than blocking them on a guess.
-  const canInit = ready && !!orgId && !isInitializing;
+  const canInit = ready && !!orgId && !!previewToken && !isInitializing;
   const canShow = ready && (!supportsState || (initialized && !open));
   const canHide = ready && (!supportsState || (initialized && open));
   const canDestroy = ready && (!supportsState || initialized);
@@ -129,7 +159,11 @@ export const PlaygroundView = () => {
     ? "Loading organization…"
     : !orgId
       ? "Select an organization to initialize the widget."
-      : isInitializing
+      : previewTokenError
+        ? `Preview authorization failed: ${previewTokenError}`
+        : !previewToken
+          ? "Preparing secure preview authorization…"
+          : isInitializing
         ? "Authorizing the widget and waiting for it to mount…"
         : bundleStatus === "loading"
         ? "Waiting for the widget bundle…"
