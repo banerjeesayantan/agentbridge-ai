@@ -1,6 +1,6 @@
 "use client";
 
-import { useOrganization } from "@clerk/nextjs";
+import { OrganizationSwitcher } from "@clerk/nextjs";
 import {
   CreditCardIcon,
   FlaskConicalIcon,
@@ -29,150 +29,70 @@ import {
 } from "@workspace/ui/components/sidebar";
 import { cn } from "@workspace/ui/lib/utils";
 
-const customerSupportItems = [
-  {
-    title: "Conversations",
-    url: "/conversations",
-    icon: InboxIcon,
-  },
-  {
-    title: "Feedback",
-    url: "/feedback",
-    icon: MessageSquareTextIcon,
-  },
-  {
-    title: "Knowledge Base",
-    url: "/files",
-    icon: LibraryBigIcon,
-  },
-];
-
-const configurationItems = [
-  {
-    title: "Playground",
-    url: "/",
-    icon: FlaskConicalIcon,
-  },
-  {
-    title: "Widget Customization",
-    url: "/customization",
-    icon: PaletteIcon,
-  },
-  {
-    title: "Integrations",
-    url: "/integrations",
-    icon: LayoutDashboardIcon,
-  },
-  {
-    title: "Voice Assistant",
-    url: "/plugins/vapi",
-    icon: Mic,
-  },
-];
-
-const accountItems = [
-  {
-    title: "Plans & Billing",
-    url: "/billing",
-    icon: CreditCardIcon,
-  },
-];
-
 const navigationGroups = [
   {
     title: "Customer Support",
-    items: customerSupportItems,
+    items: [
+      { title: "Conversations", url: "/conversations", icon: InboxIcon },
+      { title: "Feedback", url: "/feedback", icon: MessageSquareTextIcon },
+      { title: "Knowledge Base", url: "/files", icon: LibraryBigIcon },
+    ],
   },
   {
     title: "Configuration",
-    items: configurationItems,
+    items: [
+      { title: "Playground", url: "/", icon: FlaskConicalIcon },
+      { title: "Widget Customization", url: "/customization", icon: PaletteIcon },
+      { title: "Integrations", url: "/integrations", icon: LayoutDashboardIcon },
+      { title: "Voice Assistant", url: "/plugins/vapi", icon: Mic },
+    ],
   },
   {
     title: "Account",
-    items: accountItems,
+    items: [{ title: "Plans & Billing", url: "/billing", icon: CreditCardIcon }],
   },
 ];
-
-const OrganizationFooter = () => {
-  const { organization, membership, isLoaded } = useOrganization();
-
-  if (!isLoaded || !organization) {
-    return null;
-  }
-
-  const role = membership?.role
-    ?.replace(/^org:/, "")
-    .replace(/_/g, " ");
-
-  const formattedRole = role
-    ? role.charAt(0).toUpperCase() + role.slice(1)
-    : "Member";
-
-  return (
-  <div className="flex min-w-0 items-center gap-3 rounded-lg px-2 py-3 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
-  {organization.imageUrl ? (
-    <Image
-      src={organization.imageUrl}
-      alt={`${organization.name} logo`}
-      width={36}
-      height={36}
-      unoptimized
-      className="size-9 shrink-0 rounded-lg object-cover"
-    />
-  ) : (
-    <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-sidebar-accent text-sm font-semibold">
-      {organization.name.charAt(0).toUpperCase()}
-    </div>
-  )}
-
-      <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
-        <p className="truncate text-sm font-semibold">
-          {organization.name}
-        </p>
-        <p className="truncate text-xs capitalize text-muted-foreground">
-          {formattedRole}
-        </p>
-      </div>
-    </div>
-  );
-};
 
 export const DashboardSidebar = () => {
   const pathname = usePathname();
 
-  const isActive = (url: string) => {
-    if (url === "/") {
-      return pathname === "/";
-    }
-
-    return pathname === url || pathname.startsWith(`${url}/`);
-  };
+  const isActive = (url: string) =>
+    url === "/" ? pathname === "/" : pathname === url || pathname.startsWith(`${url}/`);
 
   return (
-    <Sidebar className="group" collapsible="icon">
-      <SidebarHeader />
+    <Sidebar collapsible="icon">
+      <SidebarHeader className="border-b border-sidebar-border px-3 py-3">
+        <Link href="/" aria-label="AgentBridge dashboard" className="flex min-w-0 items-center gap-2 group-data-[collapsible=icon]:justify-center">
+          <Image
+            src="/AgentBridge_logo.png"
+            alt=""
+            width={32}
+            height={32}
+            priority
+            className="size-8 shrink-0 object-contain"
+          />
+          <span className="truncate text-sm font-semibold tracking-tight group-data-[collapsible=icon]:hidden">
+            AgentBridge
+          </span>
+        </Link>
+      </SidebarHeader>
 
-      <SidebarContent className="flex-1 pt-11">
+      <SidebarContent className="min-h-0 flex-1 pt-2">
         {navigationGroups.map((group) => (
           <SidebarGroup key={group.title}>
             <SidebarGroupLabel>{group.title}</SidebarGroupLabel>
-
             <SidebarGroupContent>
               <SidebarMenu>
                 {group.items.map((item) => {
                   const active = isActive(item.url);
                   const Icon = item.icon;
-
                   return (
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton
                         asChild
                         isActive={active}
                         tooltip={item.title}
-                        className={cn(
-                          active &&
-                            "bg-gradient-to-b from-sidebar-primary to-[#0b63f3]! text-sidebar-primary-foreground! hover:to-[#0b63f3]/90!"
-                        )}
+                        className={cn(active && "bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90")}
                       >
                         <Link href={item.url}>
                           <Icon className="size-4" />
@@ -188,8 +108,25 @@ export const DashboardSidebar = () => {
         ))}
       </SidebarContent>
 
-      <SidebarFooter>
-        <OrganizationFooter />
+      <SidebarFooter className="border-t border-sidebar-border p-2">
+        <OrganizationSwitcher
+          hidePersonal
+          afterSelectOrganizationUrl="/"
+          afterCreateOrganizationUrl="/"
+          afterLeaveOrganizationUrl="/org-selection"
+          appearance={{
+            elements: {
+              rootBox: "w-full min-w-0",
+              organizationSwitcherTrigger: "w-full min-w-0 justify-start rounded-md px-2 py-2 text-sm hover:bg-sidebar-accent",
+              organizationPreview: "min-w-0",
+              organizationPreviewTextContainer: "min-w-0",
+              organizationPreviewMainIdentifier: "max-w-[9rem] truncate text-xs font-medium",
+              organizationPreviewSecondaryIdentifier: "text-[11px]",
+              avatarBox: "size-8 shrink-0",
+              userPreview: "min-w-0",
+            },
+          }}
+        />
       </SidebarFooter>
 
       <SidebarRail />
