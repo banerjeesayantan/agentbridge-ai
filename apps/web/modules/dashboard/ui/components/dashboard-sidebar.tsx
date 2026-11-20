@@ -97,7 +97,7 @@ const navigationGroups = [
 const OrganizationFooter = () => {
   const { organization, membership, isLoaded } = useOrganization();
 
-  if (!isLoaded || !organization) {
+  if (!isLoaded) {
     return null;
   }
 
@@ -114,7 +114,8 @@ const OrganizationFooter = () => {
         afterSelectOrganizationUrl="/"
         hidePersonal
       />
-      <div className="flex min-w-0 items-center gap-3 rounded-lg px-1 py-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+      {organization && (
+        <div className="flex min-w-0 items-center gap-3 rounded-lg px-1 py-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
       {organization.imageUrl ? (
         <Image
           src={organization.imageUrl}
@@ -135,8 +136,8 @@ const OrganizationFooter = () => {
         <p className="truncate text-xs capitalize text-muted-foreground">
           {formattedRole}
         </p>
-      </div>
-      </div>
+        </div>
+      )}
     </div>
   );
 };
