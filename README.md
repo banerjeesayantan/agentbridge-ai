@@ -44,6 +44,7 @@ agentbridge-ai/
 - [Security and tenant isolation](docs/architecture/security-and-tenancy.md)
 - [Implementation roadmap](docs/architecture/implementation-roadmap.md)
 - [Billing and usage behavior](docs/billing-and-usage.md)
+- [Unified Vercel deployment](docs/deployment/vercel-services.md)
 
 ## Technology stack
 
