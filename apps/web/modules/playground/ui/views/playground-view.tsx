@@ -118,7 +118,7 @@ export const PlaygroundView = () => {
     return () => {
       cancelled = true;
     };
-  }, [isLoaded, orgId, authorizePreview]);
+  }, [isLoaded, orgId, preview.frameKey, authorizePreview]);
 
   // Once the bundle, organization, and preview authorization are ready,
   // initialize the actual widget automatically.
