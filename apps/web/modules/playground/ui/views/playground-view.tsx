@@ -1,6 +1,8 @@
 "use client";
 
 import { useOrganization } from "@clerk/nextjs";
+import { useAction } from "convex/react";
+import { api } from "@workspace/backend/_generated/api";
 import { Alert, AlertDescription, AlertTitle } from "@workspace/ui/components/alert";
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
@@ -31,8 +33,8 @@ import {
   Trash2Icon,
 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
-import { EMBED_SCRIPT_URL, INTEGRATIONS, type IntegrationId } from "@/modules/integrations/constants";
+import { useEffect, useRef, useState } from "react";
+import { PLAYGROUND_EMBED_SCRIPT_URL, INTEGRATIONS, type IntegrationId } from "@/modules/integrations/constants";
 import { createScript, type WidgetPosition } from "@/modules/integrations/utils";
 import { CodeBlock } from "@/modules/integrations/ui/components/code-block";
 import {
@@ -80,13 +82,53 @@ const POSITION_LABEL: Record<WidgetPosition, string> = {
 export const PlaygroundView = () => {
   const { organization, isLoaded } = useOrganization();
   const orgId = organization?.id ?? "";
+  const authorizePreview = useAction(api.public.widgetSettings.getPreviewToken);
 
   const [position, setPosition] = useState<WidgetPosition>("bottom-right");
   const [device, setDevice] = useState<"desktop" | "mobile">("desktop");
   const [framework, setFramework] = useState<IntegrationId>("html");
+  const [previewToken, setPreviewToken] = useState<string | null>(null);
+  const [previewTokenError, setPreviewTokenError] = useState<string | null>(null);
 
   const preview = useWidgetPreview();
-  const { bundleStatus, widgetState, lastAction, supportsState, actions } = preview;
+  const { bundleStatus, isInitializing, widgetState, lastAction, supportsState, actions } = preview;
+  const autoInitKey = useRef<string | null>(null);
+
+  // Mint a short-lived token using the signed-in organization context. This
+  // lets the Playground preview work without weakening customer-site origin
+  // allowlists.
+  useEffect(() => {
+    if (!isLoaded || !orgId) {
+      setPreviewToken(null);
+      setPreviewTokenError(null);
+      return;
+    }
+    let cancelled = false;
+    setPreviewToken(null);
+    setPreviewTokenError(null);
+    void authorizePreview({ origin: window.location.origin })
+      .then(({ token }) => {
+        if (!cancelled) setPreviewToken(token);
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setPreviewTokenError(error instanceof Error ? error.message : "Could not authorize the widget preview.");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoaded, orgId, preview.frameKey, authorizePreview]);
+
+  // Once the bundle, organization, and preview authorization are ready,
+  // initialize the actual widget automatically.
+  useEffect(() => {
+    if (bundleStatus !== "ready" || !orgId || !previewToken) return;
+    const key = `${preview.frameKey}:${orgId}:${position}`;
+    if (autoInitKey.current === key) return;
+    autoInitKey.current = key;
+    actions.init(orgId, position, previewToken);
+  }, [bundleStatus, orgId, previewToken, position, preview.frameKey, actions.init]);
 
   const ready = bundleStatus === "ready";
   const initialized = widgetState?.initialized ?? false;
@@ -94,7 +136,7 @@ export const PlaygroundView = () => {
 
   // With a bundle that cannot report state we cannot know what is valid, so
   // leave the controls available rather than blocking them on a guess.
-  const canInit = ready && !!orgId;
+  const canInit = ready && !!orgId && !!previewToken && !isInitializing;
   const canShow = ready && (!supportsState || (initialized && !open));
   const canHide = ready && (!supportsState || (initialized && open));
   const canDestroy = ready && (!supportsState || initialized);
@@ -103,11 +145,13 @@ export const PlaygroundView = () => {
     ? null
     : !supportsState
       ? { tone: "warn" as Tone, text: "State unknown" }
-      : initialized
-        ? open
-          ? { tone: "success" as Tone, text: "Open" }
-          : { tone: "neutral" as Tone, text: "Hidden" }
-        : { tone: "neutral" as Tone, text: lastAction === "destroy" ? "Destroyed" : "Not initialized" };
+      : isInitializing
+        ? { tone: "warn" as Tone, text: "Initializing" }
+        : initialized
+          ? open
+            ? { tone: "success" as Tone, text: "Open" }
+            : { tone: "neutral" as Tone, text: "Hidden" }
+          : { tone: "neutral" as Tone, text: lastAction === "destroy" ? "Destroyed" : "Not initialized" };
 
   const bundle = BUNDLE_LABEL[bundleStatus];
 
@@ -115,7 +159,13 @@ export const PlaygroundView = () => {
     ? "Loading organization…"
     : !orgId
       ? "Select an organization to initialize the widget."
-      : bundleStatus === "loading"
+      : previewTokenError
+        ? `Preview authorization failed: ${previewTokenError}`
+        : !previewToken
+          ? "Preparing secure preview authorization…"
+          : isInitializing
+        ? "Authorizing the widget and waiting for it to mount…"
+        : bundleStatus === "loading"
         ? "Waiting for the widget bundle…"
         : !ready
           ? "Lifecycle controls are disabled until the bundle loads."
@@ -140,9 +190,9 @@ export const PlaygroundView = () => {
         <Card className="flex min-h-[400px] min-w-0 max-w-full flex-col gap-0 overflow-hidden py-0 sm:min-h-[460px] xl:min-h-0">
           <CardHeader className="flex flex-col items-stretch gap-3 border-b px-3 py-3 sm:flex-row sm:items-center sm:px-4">
             <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:w-auto" role="toolbar" aria-label="Widget lifecycle">
-              <Button disabled={!canInit} onClick={() => actions.init(orgId, position)} size="sm" type="button">
+              <Button disabled={!canInit} onClick={() => actions.init(orgId, position, previewToken ?? undefined)} size="sm" type="button">
                 <PlayIcon />
-                Initialize
+                {isInitializing ? "Initializing…" : "Initialize"}
               </Button>
               <Button disabled={!canShow} onClick={actions.show} size="sm" type="button" variant="outline">
                 <EyeIcon />
@@ -251,7 +301,6 @@ export const PlaygroundView = () => {
                     onValueChange={(value) => {
                       const next = value as WidgetPosition;
                       setPosition(next);
-                      actions.applyPosition(next);
                     }}
                     value={position}
                   >
@@ -360,8 +409,8 @@ export const PlaygroundView = () => {
                     </div>
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-muted-foreground">Script</span>
-                      <span className="truncate font-mono text-xs" title={EMBED_SCRIPT_URL}>
-                        {EMBED_SCRIPT_URL}
+                      <span className="truncate font-mono text-xs" title={PLAYGROUND_EMBED_SCRIPT_URL}>
+                        {PLAYGROUND_EMBED_SCRIPT_URL}
                       </span>
                     </div>
                   </CardContent>
