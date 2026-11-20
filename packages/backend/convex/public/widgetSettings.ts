@@ -32,6 +32,7 @@ export const getPreviewToken = action({
 
     let origin: string;
     try {
+      if (args.origin.length > 255) throw new Error("Preview origin is too long.");
       const url = new URL(args.origin);
       const local =
         url.protocol === "http:" &&
