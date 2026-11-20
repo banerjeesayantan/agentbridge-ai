@@ -50,7 +50,7 @@ Clerk authentication and organization membership do not automatically implement 
 ## Widget installation authorization
 
 - Each organization configures an explicit allowlist of website origins in Widget Customization. Enter exact origins (scheme + host + optional port), one per line; HTTPS is required outside localhost development.
-- The Playground uses a separate ten-minute, Clerk-authenticated preview token bound to the dashboard origin. It does not add preview deployments to the customer site's allowed-origin list; preview tokens are short-lived and limited to the signed-in organization.
+- The Playground uses a separate ten-minute, Clerk-authenticated preview token bound to the dashboard origin. It does not add preview deployments to the customer site's allowed-origin list; preview tokens are short-lived and limited to the signed-in organization admin.
 - After changing Convex functions, deploy them to the configured production Convex deployment with `pnpm --filter @workspace/backend deploy`. The Vercel app deployment does not deploy Convex functions automatically.
 - The embed script requests `/widget/bootstrap?organizationId=...` from the Convex HTTP deployment. The server reads the browser-controlled `Origin` header, checks it against the stored allowlist, and returns a five-minute HMAC-signed installation token only with an exact-origin CORS response.
 - The token is placed in the iframe URL fragment (not sent in the HTTP request or Referer) and is verified server-side before widget settings are returned or a visitor session is created. Visitor sessions retain the verified installation origin.
