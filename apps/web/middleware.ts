@@ -32,6 +32,9 @@ export default clerkMiddleware(async (auth, req) => {
 });
 
 export const config = {
+  // Next.js 15.5 supports stable Node.js middleware. Vercel Services
+  // currently rejects Edge Runtime middleware output.
+  runtime: "nodejs",
   matcher: [
     // Skip Next.js internals and all static files, unless found in search params
     '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',

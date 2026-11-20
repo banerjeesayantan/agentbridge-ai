@@ -1,9 +1,19 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "ui": "tui",
+  "globalEnv": [
+    "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+    "NEXT_PUBLIC_CONVEX_URL",
+    "NEXT_PUBLIC_EMBED_SCRIPT_URL"
+  ],
+  "globalPassThroughEnv": [
+    "CLERK_SECRET_KEY",
+    "SENTRY_AUTH_TOKEN"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
+      "passThroughEnv": ["SENTRY_AUTH_TOKEN"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"]
     },

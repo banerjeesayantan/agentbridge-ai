@@ -6,17 +6,18 @@ export default defineConfig({
     lib: {
       entry: resolve(__dirname, "embed.ts"),
       name: "AgentBridgeWidget",
-      fileName: "widget",
+      // Vercel routes /embed/* to this service and preserves the path.
+      fileName: () => "embed/widget.js",
       formats: ["iife"],
     },
     rollupOptions: {
       output: {
         extend: true,
-      }
-    }
+      },
+    },
   },
   server: {
     port: 3002,
-    open: "/demo.html"
+    open: "/demo.html",
   },
 });

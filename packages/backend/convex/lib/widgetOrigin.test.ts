@@ -35,6 +35,23 @@ describe("widget installation token", () => {
     });
   });
 
+  it("preserves the authenticated Playground preview claim", async () => {
+    vi.stubEnv("WIDGET_INSTALLATION_SECRET", secret);
+    const now = Date.now();
+    const token = await signWidgetInstallToken({
+      organizationId: "org_123456",
+      origin: "https://preview.example",
+      issuedAt: now,
+      expiresAt: now + 5 * 60_000,
+      preview: true,
+    });
+    await expect(verifyWidgetInstallToken(token, "org_123456")).resolves.toMatchObject({
+      organizationId: "org_123456",
+      origin: "https://preview.example",
+      preview: true,
+    });
+  });
+
   it("rejects tampering, a different organization, and a different origin", async () => {
     vi.stubEnv("WIDGET_INSTALLATION_SECRET", secret);
     const now = Date.now();
