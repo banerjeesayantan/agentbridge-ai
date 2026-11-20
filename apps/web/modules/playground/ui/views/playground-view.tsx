@@ -252,7 +252,7 @@ export const PlaygroundView = () => {
           <CardContent className="flex min-h-[300px] min-w-0 flex-1 items-stretch justify-center overflow-hidden p-2 sm:min-h-[360px] sm:p-4 xl:min-h-0">
             <div
               className={cn(
-                "w-full overflow-hidden border bg-white shadow-sm transition-[max-width] duration-200",
+                "h-full min-h-0 w-full overflow-hidden border bg-white shadow-sm transition-[max-width] duration-200",
                 device === "mobile" ? "max-w-[375px] rounded-[1.75rem] border-4 border-foreground/80" : "rounded-lg",
               )}
             >
