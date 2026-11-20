@@ -59,7 +59,7 @@ export const getPreviewToken = action({
     }
 
     const issuedAt = Date.now();
-    const expiresAt = issuedAt + 5 * 60_000;
+    const expiresAt = issuedAt + 10 * 60_000;
     const token = await signWidgetInstallToken({
       organizationId,
       origin,
