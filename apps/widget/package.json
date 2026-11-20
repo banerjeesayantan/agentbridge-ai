@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack --port 3001",
-    "build": "next build",
+    "build": "pnpm --filter embed build && next build",
     "start": "next start",
     "lint": "next lint",
     "lint:fix": "next lint --fix",
