@@ -86,7 +86,7 @@ export const PlaygroundView = () => {
   const [framework, setFramework] = useState<IntegrationId>("html");
 
   const preview = useWidgetPreview();
-  const { bundleStatus, widgetState, lastAction, supportsState, actions } = preview;
+  const { bundleStatus, isInitializing, widgetState, lastAction, supportsState, actions } = preview;
   const autoInitKey = useRef<string | null>(null);
 
   // Once the real bundle and Clerk organization are both ready, initialize the
@@ -106,7 +106,7 @@ export const PlaygroundView = () => {
 
   // With a bundle that cannot report state we cannot know what is valid, so
   // leave the controls available rather than blocking them on a guess.
-  const canInit = ready && !!orgId;
+  const canInit = ready && !!orgId && !isInitializing;
   const canShow = ready && (!supportsState || (initialized && !open));
   const canHide = ready && (!supportsState || (initialized && open));
   const canDestroy = ready && (!supportsState || initialized);
@@ -115,11 +115,13 @@ export const PlaygroundView = () => {
     ? null
     : !supportsState
       ? { tone: "warn" as Tone, text: "State unknown" }
-      : initialized
-        ? open
-          ? { tone: "success" as Tone, text: "Open" }
-          : { tone: "neutral" as Tone, text: "Hidden" }
-        : { tone: "neutral" as Tone, text: lastAction === "destroy" ? "Destroyed" : "Not initialized" };
+      : isInitializing
+        ? { tone: "warn" as Tone, text: "Initializing" }
+        : initialized
+          ? open
+            ? { tone: "success" as Tone, text: "Open" }
+            : { tone: "neutral" as Tone, text: "Hidden" }
+          : { tone: "neutral" as Tone, text: lastAction === "destroy" ? "Destroyed" : "Not initialized" };
 
   const bundle = BUNDLE_LABEL[bundleStatus];
 
@@ -127,7 +129,9 @@ export const PlaygroundView = () => {
     ? "Loading organization…"
     : !orgId
       ? "Select an organization to initialize the widget."
-      : bundleStatus === "loading"
+      : isInitializing
+        ? "Authorizing the widget and waiting for it to mount…"
+        : bundleStatus === "loading"
         ? "Waiting for the widget bundle…"
         : !ready
           ? "Lifecycle controls are disabled until the bundle loads."
@@ -154,7 +158,7 @@ export const PlaygroundView = () => {
             <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:w-auto" role="toolbar" aria-label="Widget lifecycle">
               <Button disabled={!canInit} onClick={() => actions.init(orgId, position)} size="sm" type="button">
                 <PlayIcon />
-                Initialize
+                {isInitializing ? "Initializing…" : "Initialize"}
               </Button>
               <Button disabled={!canShow} onClick={actions.show} size="sm" type="button" variant="outline">
                 <EyeIcon />
