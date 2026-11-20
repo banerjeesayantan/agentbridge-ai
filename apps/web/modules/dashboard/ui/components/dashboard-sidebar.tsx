@@ -152,9 +152,27 @@ export const DashboardSidebar = () => {
 
   return (
     <Sidebar className="group" collapsible="icon">
-      <SidebarHeader />
+      <SidebarHeader className="px-3 py-3">
+        <Link
+          href="/"
+          aria-label="AgentBridge AI home"
+          className="flex min-w-0 items-center gap-2 group-data-[collapsible=icon]:justify-center"
+        >
+          <Image
+            src="/AgentBridge_logo.png"
+            alt="AgentBridge AI logo"
+            width={36}
+            height={36}
+            priority
+            className="size-9 shrink-0 object-contain"
+          />
+          <span className="truncate text-base font-semibold tracking-tight group-data-[collapsible=icon]:hidden">
+            AgentBridge
+          </span>
+        </Link>
+      </SidebarHeader>
 
-      <SidebarContent className="flex-1 pt-11">
+      <SidebarContent className="flex-1 pt-2">
         {navigationGroups.map((group) => (
           <SidebarGroup key={group.title}>
             <SidebarGroupLabel>{group.title}</SidebarGroupLabel>
