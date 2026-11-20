@@ -7,7 +7,8 @@
     "NEXT_PUBLIC_EMBED_SCRIPT_URL"
   ],
   "globalPassThroughEnv": [
-    "CLERK_SECRET_KEY"
+    "CLERK_SECRET_KEY",
+    "SENTRY_AUTH_TOKEN"
   ],
   "tasks": {
     "build": {
