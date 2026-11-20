@@ -3,7 +3,8 @@
   "type": "module",
   "scripts": {
     "dev": "convex dev",
-    "setup": "convex dev --until-success"
+    "setup": "convex dev --until-success",
+    "deploy": "convex deploy"
   },
   "exports": {
     "./convex": "./convex/*.ts"
