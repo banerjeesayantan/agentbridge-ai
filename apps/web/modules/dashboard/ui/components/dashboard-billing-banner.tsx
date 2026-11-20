@@ -5,18 +5,19 @@ import { Alert, AlertDescription, AlertTitle } from "@workspace/ui/components/al
 import { Badge } from "@workspace/ui/components/badge";
 import { Button } from "@workspace/ui/components/button";
 import { useQuery } from "convex/react";
-import { AlertTriangleIcon, CheckCircle2Icon, Clock3Icon, SparklesIcon } from "lucide-react";
+import { AlertTriangleIcon, CheckCircle2Icon, Clock3Icon } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
 export const DashboardBillingBanner = () => {
   const summary = useQuery(api.private.usage.summary);
-  const [checkoutReturned, setCheckoutReturned] = useState(false);
+  const [checkoutReturned, setCheckoutReturned] = useState<"success" | "cancelled" | null>(null);
 
   useEffect(() => {
     const url = new URL(window.location.href);
-    if (url.searchParams.get("checkout") !== "success") return;
-    setCheckoutReturned(true);
+    const checkout = url.searchParams.get("checkout");
+    if (checkout !== "success" && checkout !== "cancelled") return;
+    setCheckoutReturned(checkout);
     url.searchParams.delete("checkout");
     window.history.replaceState({}, "", `${url.pathname}${url.search}${url.hash}`);
   }, []);
@@ -39,6 +40,20 @@ export const DashboardBillingBanner = () => {
   }
 
   if (!checkoutReturned) return null;
+
+  if (checkoutReturned === "cancelled") {
+    return (
+      <div className="px-4 pt-3">
+        <Alert>
+          <AlertTitle>Checkout cancelled</AlertTitle>
+          <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
+            <span>No subscription change was made. Your organization remains on its current plan.</span>
+            <Button asChild size="sm" variant="outline"><Link href="/billing">View plans</Link></Button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 
   const confirmed = summary.plan !== "free";
   return (
