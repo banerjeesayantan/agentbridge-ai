@@ -190,7 +190,7 @@ export const PlaygroundView = () => {
         <Card className="flex min-h-[400px] min-w-0 max-w-full flex-col gap-0 overflow-hidden py-0 sm:min-h-[460px] xl:min-h-0">
           <CardHeader className="flex flex-col items-stretch gap-3 border-b px-3 py-3 sm:flex-row sm:items-center sm:px-4">
             <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:w-auto" role="toolbar" aria-label="Widget lifecycle">
-              <Button disabled={!canInit} onClick={() => actions.init(orgId, position)} size="sm" type="button">
+              <Button disabled={!canInit} onClick={() => actions.init(orgId, position, previewToken ?? undefined)} size="sm" type="button">
                 <PlayIcon />
                 {isInitializing ? "Initializing…" : "Initialize"}
               </Button>
