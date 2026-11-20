@@ -48,7 +48,7 @@ export const create = action({
     if (!gate.ok) rateLimited(gate.retryAfterMs);
     const claims = await verifyWidgetInstallToken(args.installToken, organizationId);
     const installation = await ctx.runQuery(internal.system.widgetInstallations.getConfig, { organizationId });
-    if (!installation || !installation.allowedOrigins.includes(claims.origin)) {
+    if (!installation || (!claims.preview && !installation.allowedOrigins.includes(claims.origin))) {
       throw new ConvexError({ code: "UNAUTHORIZED", message: "This website is not authorized to use this widget." });
     }
 
@@ -84,7 +84,12 @@ export const validate = mutation({
     const settings = await ctx.db.query("widgetSettings")
       .withIndex("by_organization_id", (q) => q.eq("organizationId", contactSession.organizationId))
       .unique();
-    if (organization?.status !== "active" || !contactSession.installationOrigin || claims.origin !== contactSession.installationOrigin || !(settings?.allowedOrigins ?? []).includes(claims.origin)) return { valid: false };
+    if (
+      organization?.status !== "active" ||
+      !contactSession.installationOrigin ||
+      claims.origin !== contactSession.installationOrigin ||
+      (!claims.preview && !(settings?.allowedOrigins ?? []).includes(claims.origin))
+    ) return { valid: false };
 
     return { valid: true };
   },
