@@ -120,6 +120,7 @@ for (const level of ["warn", "error"] as const) {
 }
     setBundleStatus("loading");
     const script = doc.createElement("script");
+    const bundleStartedAt = performance.now();
     const scriptUrl = new URL(PLAYGROUND_EMBED_SCRIPT_URL, window.location.origin).toString();
     script.src = scriptUrl;
     script.async = true;
@@ -138,7 +139,7 @@ for (const level of ["warn", "error"] as const) {
       if (typeof api.getState !== "function") {
         log("warn", "Bundle has no getState(); lifecycle badges cannot be verified. Rebuild apps/embed.");
       }
-      log("success", "Widget bundle loaded.");
+      log("success", `Widget bundle loaded in ${Math.round(performance.now() - bundleStartedAt)} ms.`);
       sync();
     };
     script.onerror = () => {
@@ -188,11 +189,12 @@ for (const level of ["warn", "error"] as const) {
         // The embed's init() starts an asynchronous bootstrap request and
         // returns before its launcher/iframe is mounted. Do not treat the
         // immediate getState() result as an initialization failure.
+        const initializationStartedAt = performance.now();
         const result = api.init({ organizationId, position, installToken });
         if (result === false) {
           setIsInitializing(false);
           sync();
-          log("error", "init() rejected the configuration before mounting. Check the organization ID and position.");
+          log("error", `init() rejected the configuration after ${Math.round(performance.now() - initializationStartedAt)} ms. Check the organization ID and position.`);
           return;
         }
 
@@ -210,7 +212,7 @@ for (const level of ["warn", "error"] as const) {
             const state = sync();
             if (state?.initialized && state.organizationId === organizationId) {
               setIsInitializing(false);
-              log("success", `Initialized (position: ${position}).`);
+              log("success", `Initialized in ${Math.round(performance.now() - initializationStartedAt)} ms (position: ${position}).`);
               return;
             }
           }
