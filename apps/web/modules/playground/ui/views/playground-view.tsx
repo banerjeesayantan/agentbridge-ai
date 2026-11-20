@@ -31,7 +31,7 @@ import {
   Trash2Icon,
 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { EMBED_SCRIPT_URL, INTEGRATIONS, type IntegrationId } from "@/modules/integrations/constants";
 import { createScript, type WidgetPosition } from "@/modules/integrations/utils";
 import { CodeBlock } from "@/modules/integrations/ui/components/code-block";
@@ -87,6 +87,18 @@ export const PlaygroundView = () => {
 
   const preview = useWidgetPreview();
   const { bundleStatus, widgetState, lastAction, supportsState, actions } = preview;
+  const autoInitKey = useRef<string | null>(null);
+
+  // Once the real bundle and Clerk organization are both ready, initialize the
+  // actual widget automatically. Re-run only after a preview reload, org
+  // change, or position change; the explicit lifecycle controls remain usable.
+  useEffect(() => {
+    if (bundleStatus !== "ready" || !orgId) return;
+    const key = `${preview.frameKey}:${orgId}:${position}`;
+    if (autoInitKey.current === key) return;
+    autoInitKey.current = key;
+    actions.init(orgId, position);
+  }, [bundleStatus, orgId, position, preview.frameKey, actions.init]);
 
   const ready = bundleStatus === "ready";
   const initialized = widgetState?.initialized ?? false;
